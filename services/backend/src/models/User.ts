@@ -1,0 +1,117 @@
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../../config/database';
+import Role from './Role';
+
+
+
+class User extends Model {
+  public id!: number;
+  public rut!: string;
+  public email!: string;
+  public passwordHash!: string; 
+  public firstName!: string;    
+  public lastName!: string;     
+  public phone!: string;
+  public roleId!: number;      
+  public isActive!: boolean;    
+  public lastLogin!: Date | null; 
+  public failedLoginAttempts!: number;
+  public accountLocked!: boolean;    
+  public lastFailedLogin!: Date | null; 
+
+ 
+  public readonly createdAt!: Date;
+  public role?: Role;
+}
+
+
+User.init({
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true,
+  },
+  rut: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    unique: true,
+    field: 'rut', 
+  },
+  email: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    unique: true,
+    validate: {
+      isEmail: true,
+    },
+    field: 'email',
+  },
+  passwordHash: { 
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    field: 'password_hash', 
+  },
+  firstName: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    field: 'first_name', 
+  },
+  lastName: { 
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    field: 'last_name', 
+  },
+  phone: {
+    type: DataTypes.STRING(20),
+    field: 'phone', 
+  },
+  roleId: { 
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'roles', 
+      key: 'id',
+    },
+    field: 'role_id', 
+  },
+  isActive: { 
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active',
+  },
+  lastLogin: { 
+    type: DataTypes.DATE,
+    field: 'last_login',
+  },
+  failedLoginAttempts: { 
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'failed_login_attempts', 
+  },
+  accountLocked: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'account_locked',
+  },
+  lastFailedLogin: { 
+    type: DataTypes.DATE,
+    field: 'last_failed_login', 
+  },
+  createdAt: { 
+    type: DataTypes.DATE,
+    allowNull: false,
+    field: 'created_at'
+  }
+}, {
+  sequelize,
+  modelName: 'User',
+  tableName: 'users',
+  timestamps: true, 
+  createdAt: 'created_at', 
+  updatedAt: false,
+});
+
+// Define associations
+User.belongsTo(Role, { foreignKey: 'roleId',  as: 'role' }); 
+
+export default User;
