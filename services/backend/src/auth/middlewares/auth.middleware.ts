@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import config from '../../../config/env';
+import config from '../../config/env';
 import User from '../../models/User';
 import Role from '../../models/Role'; 
 

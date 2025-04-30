@@ -1,96 +1,82 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import User from '../../models/User';
-import Role from '../../models/Role';
-import config from '../../../config/env'; 
+import jwt, { Secret, SignOptions } from 'jsonwebtoken';
+import { User, Role } from '../../models';
+import config from '../../config/env';
 
 class AuthController {
-  async login(req: Request, res: Response) {
+  async login(req: Request, res: Response): Promise<void> {
     try {
+      // Validar que se proporcionó un email y password
       const { email, password } = req.body;
-
-      // Buscar usuario including the Role
-      const user = await User.findOne({
-        where: { email },
-        include: [{ model: Role, as: 'role' }], 
-      });
-
-      // Check if user exists
-      if (!user) {
-        return res.status(401).json({ error: 'Credenciales inválidas' });
+      if (!email || !password) {
+        res.status(400).json({ error: 'Email y contraseña son requeridos' });
+        return;
       }
-
-      // Check if the role was successfully included/assigned
-      if (!user.role) {
-          console.error('User role not loaded or user has no role assigned for user ID:', user.id);
-          // Consider if 401/403 is more appropriate if a user MUST have a role
-          return res.status(500).json({ error: 'Error interno al cargar datos de usuario o rol no asignado.' });
+      
+      // Validar formato de email con una expresión regular simple
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        res.status(400).json({ error: 'Formato de email inválido' });
+        return;
       }
-      // Assign the validated role to a new constant for type safety
-      const userRole = user.role;
-
-      // Check if account is locked
-      if (user.accountLocked) {
-        const lockTime = user.lastFailedLogin?.getTime() || 0;
-        const now = new Date().getTime();
-        const lockDuration = 30 * 60 * 1000; // 30 minutes
-
-        if (now - lockTime < lockDuration) {
-          return res.status(403).json({
-            error: 'Cuenta bloqueada temporalmente. Intente más tarde.'
-          });
-        } else {
-          // Unlock account if lock duration has passed
-          await user.update({
-            accountLocked: false,
-            failedLoginAttempts: 0 // Reset attempts on unlock
-          });
-        }
+      
+      // Buscar usuario en la base de datos
+      console.log('1. Buscando usuario...');
+      const user = await User.findOne({ where: { email }, include: [{ model: Role, as: 'role' }] });
+      console.log('2. Usuario encontrado:', user ? user.email : 'No encontrado');
+      if (!user || !user.role) { 
+        res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+        return; 
       }
-
-      // Verify password
+      const userRole = user.role; 
+      if (!user.passwordHash) { 
+        res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+        return; 
+      }
+      console.log('3. Comparando contraseña...');
+      
       const isMatch = await bcrypt.compare(password, user.passwordHash);
+      console.log('4. Contraseña coincide:', isMatch);
       if (!isMatch) {
-        // Handle failed login attempt
-        const attempts = (user.failedLoginAttempts || 0) + 1;
-        const maxAttempts = 5; 
 
-        await user.update({
-          failedLoginAttempts: attempts,
-          lastFailedLogin: new Date(),
-          accountLocked: attempts >= maxAttempts,
-        });
-
-        return res.status(401).json({
-          error: 'Credenciales inválidas',
-          attemptsLeft: maxAttempts - attempts,
-          accountLocked: attempts >= maxAttempts,
-        });
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+        user.lastFailedLogin = new Date();
+        if (user.failedLoginAttempts >= 5) {
+          user.accountLocked = true;
+          user.lastFailedLogin = new Date();
+        }
+        await user.save(); 
+        console.log('Contraseña incorrecta, actualizando intentos.');
+        res.status(401).json({ error: 'Usuario o contraseña incorrectos' }); // Devuelve error
+        return;
       }
 
-      // --- Login Successful ---
-
-      // Reset failed attempts and update last login time
       await user.update({
         failedLoginAttempts: 0,
         lastLogin: new Date(),
-        lastFailedLogin: null 
+        lastFailedLogin: null
       });
 
-      // Generate JWT - Use the userRole constant
-      const token = jwt.sign(
-        {
-          id: user.id,
-          role: userRole.name, 
-          email: user.email,
 
-        },
-        config.JWT_SECRET as string, 
-        { expiresIn: config.JWT_EXPIRES_IN } 
-      );
+      console.log('JWT Secret:', config.JWT_SECRET);
+      console.log('Tipo de JWT Secret:', typeof config.JWT_SECRET);
+      console.log('JWT Expires In:', config.JWT_EXPIRES_IN);
+      console.log('Tipo de JWT Expires In:', typeof config.JWT_EXPIRES_IN);
+      console.log('Payload:', { id: user.id, role: userRole.name, email: user.email });
 
-      // Send response - Use the userRole constant
+      const jwtSecret: Secret = config.JWT_SECRET as string; 
+      const jwtOptions: SignOptions = {
+        expiresIn: config.JWT_EXPIRES_IN
+      };
+      const jwtPayload = {
+        id: user.id,
+        role: userRole.name,
+        email: user.email,
+      };
+
+      const token = jwt.sign(jwtPayload, jwtSecret, jwtOptions);
+
       res.json({
         token,
         user: {
@@ -98,7 +84,7 @@ class AuthController {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: userRole.name, 
+          role: userRole.name,
         },
       });
 
@@ -107,7 +93,6 @@ class AuthController {
       res.status(500).json({ error: 'Error interno del servidor' });
     }
   }
-
 }
 
 export default new AuthController();

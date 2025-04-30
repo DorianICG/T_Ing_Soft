@@ -21,7 +21,8 @@ CREATE TABLE users (
     failed_login_attempts INTEGER DEFAULT 0, 
     account_locked BOOLEAN DEFAULT FALSE,   
     last_failed_login TIMESTAMP,             
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_at TIMESTAMP
 );
 
 -- TABLA DE ORGANIZACIONES (Colegios)
@@ -203,22 +204,39 @@ CREATE TABLE audit_log (
     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
 CREATE OR REPLACE FUNCTION log_audit()
 RETURNS TRIGGER AS $$
+DECLARE
+    v_user_id INT;
 BEGIN
+    BEGIN
+        v_user_id := current_setting('myapp.current_user_id')::INT;
+    EXCEPTION WHEN OTHERS THEN
+        v_user_id := NULL; 
+    END;
+
+    IF v_user_id IS NULL THEN
+        RAISE NOTICE 'myapp.current_user_id no está definido para la auditoría en tabla %', TG_TABLE_NAME;
+    END IF;
+
     IF TG_OP = 'INSERT' THEN
         INSERT INTO audit_log (table_name, record_id, action, user_id)
-        VALUES (TG_TABLE_NAME, NEW.id, 'INSERT', current_user_id());
+        VALUES (TG_TABLE_NAME, NEW.id, 'INSERT', v_user_id);
+        RETURN NEW; 
     ELSIF TG_OP = 'UPDATE' THEN
         INSERT INTO audit_log (table_name, record_id, action, user_id)
-        VALUES (TG_TABLE_NAME, NEW.id, 'UPDATE', current_user_id());
+        VALUES (TG_TABLE_NAME, NEW.id, 'UPDATE', v_user_id); 
+        RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
         INSERT INTO audit_log (table_name, record_id, action, user_id)
-        VALUES (TG_TABLE_NAME, OLD.id, 'DELETE', current_user_id());
+        VALUES (TG_TABLE_NAME, OLD.id, 'DELETE', v_user_id);
+        RETURN OLD; 
     END IF;
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
+
 
 -- Aplicar a tablas clave
 CREATE TRIGGER users_audit
