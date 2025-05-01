@@ -2,7 +2,6 @@ import nodemailer from 'nodemailer';
 import config from '../config/env';
 
 // 1. Crear el transporter de Nodemailer
-//    Utiliza la configuración del archivo env.ts
 const transporter = nodemailer.createTransport({
   host: config.EMAIL_HOST,
   port: config.EMAIL_PORT,
@@ -25,7 +24,6 @@ interface MailOptions {
 // 2. Función genérica para enviar correos
 export const sendEmail = async (options: MailOptions): Promise<void> => {
   try {
-    // Verificar si la configuración esencial del email está presente
     if (!config.EMAIL_HOST || !config.EMAIL_USER || !config.EMAIL_PASS) {
         console.error('Error: Configuración de email incompleta en variables de entorno.');
         throw new Error('La configuración del servicio de email está incompleta.');

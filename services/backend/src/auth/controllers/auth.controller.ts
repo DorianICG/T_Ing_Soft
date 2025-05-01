@@ -95,8 +95,6 @@ class AuthController {
         return;
       }
 
-      // --- Contraseña Correcta ---
-
       // 4. Verificar si la cuenta está bloqueada
       if (user.accountLocked) {
         res.status(403).json({ error: 'Cuenta bloqueada. Contacta al administrador.' });
@@ -111,13 +109,11 @@ class AuthController {
       const mfaCodeHash = await bcrypt.hash(mfaCode, saltRounds);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Expira en 10 minutos
 
-      // Actualizar usuario con código MFA hasheado, expiración y resetear intentos
       await user.update({
         mfaCodeHash: mfaCodeHash,
         mfaCodeExpiresAt: expiresAt,
-        failedLoginAttempts: 0, // Resetear intentos aquí
+        failedLoginAttempts: 0,
         lastFailedLogin: null
-        // NO actualizamos lastLogin aquí, se hará después de verificar MFA
       });
 
       // 6. Enviar código por email
@@ -131,10 +127,8 @@ class AuthController {
         });
       } catch (emailError) {
         console.error("Error al enviar email MFA:", emailError);
-        // Considera qué hacer si el email falla. Por ahora, error 500.
         res.status(500).json({ error: 'Error al enviar el código de verificación por email.' });
       }
-      // Detener ejecución aquí, esperar la llamada a /verify-mfa
 
     } catch (error) {
       console.error('Error en login:', error);
@@ -151,11 +145,21 @@ class AuthController {
       res.status(400).json({ error: 'Email y código son requeridos' });
       return;
     }
-    // Podrías añadir validación de formato de email y código aquí
+    // 1.1 Validación de formato de email
+    if (!emailRegex.test(email)) {
+      res.status(400).json({ error: 'Formato de email inválido' });
+      return;
+    }
+
+    // 1.2 Validación de formato de código (6 dígitos numéricos)
+    const codeRegex = /^\d{6}$/;
+    if (typeof code !== 'string' || !codeRegex.test(code)) {
+      res.status(400).json({ error: 'El código debe ser de 6 dígitos numéricos' });
+      return;
+    }
 
     try {
       console.log(`Verificando MFA para ${email} con código ${code}`);
-      // 2. Buscar usuario (incluir rol para el payload del token final)
       const user = await User.findOne({ where: { email }, include: [{ model: Role, as: 'role' }] });
 
       if (!user || !user.role) {
@@ -166,7 +170,6 @@ class AuthController {
       // 3. Verificar si hay un código MFA pendiente y si no ha expirado
       if (!user.mfaCodeHash || !user.mfaCodeExpiresAt || user.mfaCodeExpiresAt < new Date()) {
         console.log('Código MFA no encontrado, inválido o expirado.');
-        // Opcional: Limpiar campos MFA expirados si existen
         if (user.mfaCodeExpiresAt && user.mfaCodeExpiresAt < new Date()) {
             await user.update({ mfaCodeHash: null, mfaCodeExpiresAt: null });
         }
@@ -179,7 +182,6 @@ class AuthController {
 
       if (!isCodeMatch) {
         console.log('Código MFA no coincide.');
-        // Opcional: Implementar lógica de intentos fallidos para MFA aquí si se desea
         res.status(400).json({ error: 'Código de verificación incorrecto.' });
         return;
       }
@@ -191,20 +193,19 @@ class AuthController {
       await user.update({
         mfaCodeHash: null,
         mfaCodeExpiresAt: null,
-        lastLogin: new Date(), // <-- Actualizar lastLogin AHORA
-        // failedLoginAttempts ya se reseteó en el paso de login
+        lastLogin: new Date(), 
       });
 
       // 6. Generar el Token JWT de Sesión final
-      const userRole = user.role; // Rol ya incluido
+      const userRole = user.role;
       const jwtPayload = {
         id: user.id,
-        role: userRole.name, // Usar el nombre del rol
+        role: userRole.name,
         email: user.email,
       };
-      const jwtSecret: Secret = config.JWT_SECRET as string; // Asegurar tipo Secret
+      const jwtSecret: Secret = config.JWT_SECRET as string;
       const jwtOptions: SignOptions = {
-        expiresIn: config.JWT_EXPIRES_IN // Usar valor numérico de config
+        expiresIn: config.JWT_EXPIRES_IN
       };
 
       console.log('Generando token de sesión final...');
@@ -215,7 +216,7 @@ class AuthController {
       res.json({
         message: 'Verificación MFA exitosa. Login completo.',
         token,
-        user: { // Enviar solo datos necesarios/seguros
+        user: {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
@@ -306,7 +307,6 @@ class AuthController {
       const user = await User.findOne({
         where: {
           resetPasswordTokenHash: hashedToken,
-          // resetPasswordExpiresAt: { [Op.gt]: new Date() } // Sequelize Op.gt requiere importarlo
         },
       });
 
