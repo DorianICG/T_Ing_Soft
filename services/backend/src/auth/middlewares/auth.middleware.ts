@@ -15,7 +15,6 @@ export const authenticate = (roles: string[] = []) => {
 
       const decoded = jwt.verify(token, config.JWT_SECRET) as any;
 
-      // Fetch user and include their role information
       const user = await User.findByPk(decoded.id, {
         include: [{ model: Role, as: 'role' }],
       });
@@ -24,7 +23,6 @@ export const authenticate = (roles: string[] = []) => {
         return res.status(401).json({ error: 'Usuario no encontrado' });
       }
 
-      // Type assertion or check needed here if 'role' might not be loaded
       const userRole = (user as any).role;
       if (!userRole || !userRole.name) {
          console.error('User role information is missing:', user);
@@ -32,12 +30,10 @@ export const authenticate = (roles: string[] = []) => {
       }
 
 
-      // Verify if the user's role is authorized
       if (roles.length > 0 && !roles.includes(userRole.name)) {
         return res.status(403).json({ error: 'Acceso prohibido. Rol no autorizado.' });
       }
 
-      // Add user to the request object (consider defining a custom Request type)
       (req as any).user = user;
       next();
     } catch (error) {
@@ -53,7 +49,6 @@ export const authenticate = (roles: string[] = []) => {
   };
 };
 
-// Middleware for specific roles
 export const isAdmin = authenticate(['ADMIN']);
 export const isInspector = authenticate(['INSPECTOR']);
 export const isParent = authenticate(['PARENT']);

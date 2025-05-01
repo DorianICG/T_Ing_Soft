@@ -11,14 +11,13 @@ const opts = {
 passport.use(
   new JwtStrategy(opts, async (jwtPayload, done) => {
     try {
-      // Ensure User model and findByPk are working correctly
       const user = await User.findByPk(jwtPayload.id);
       if (user) {
-        return done(null, user); // Pass the user object
+        return done(null, user); 
       }
-      return done(null, false); // User not found
+      return done(null, false); 
     } catch (error) {
-      return done(error, false); // Error during database lookup
+      return done(error, false);
     }
   })
 );

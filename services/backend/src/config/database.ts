@@ -10,17 +10,10 @@ const sequelize = new Sequelize(
     host: config.DB_HOST,     
     dialect: 'postgres',      
     port: config.DB_PORT,
-    logging: console.log,       // Log SQL queries (optional, can be false)
-    // dialectOptions: { // Optional: Add SSL options if required for cloud databases
-    //   ssl: {
-    //     require: true,
-    //     rejectUnauthorized: false // Adjust as needed for your SSL setup
-    //   }
-    // }
+    logging: console.log
   }
 );
 
-// Test the connection (optional but recommended)
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
@@ -32,5 +25,4 @@ const testConnection = async () => {
 
 testConnection();
 
-// Export the configured Sequelize instance
 export default sequelize;
