@@ -16,7 +16,10 @@ class User extends Model {
   public failedLoginAttempts!: number;
   public accountLocked!: boolean;
   public lastFailedLogin?: Date | null;
-
+  public mfaCodeHash?: string | null;
+  public mfaCodeExpiresAt?: Date | null;
+  public resetPasswordTokenHash?: string | null;
+  public resetPasswordExpiresAt?: Date | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -103,7 +106,27 @@ User.init({
       type: DataTypes.DATE,
       allowNull: true,
       field: 'last_failed_login'
-  }
+  },
+  mfaCodeHash: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'mfa_code_hash',
+  },
+  mfaCodeExpiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'mfa_code_expires_at',
+  },
+  resetPasswordTokenHash: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'reset_password_token_hash',
+  },
+  resetPasswordExpiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'reset_password_expires_at',
+  },
 }, {
   tableName: 'users',
   sequelize,

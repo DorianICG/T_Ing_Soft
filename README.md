@@ -76,18 +76,10 @@ expo start --web
   - Scan the QR code with the Expo Go app on your device
   - Press 'a' for Android emulator or 'i' for iOS simulator
 
-## Features
-- Cross-platform mobile and web application using Expo
-- Robust backend API
-- Structured database management
-- [Add specific features of your application]
 
-## Contributing
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Backend 
+1. cd services/backend
+2. npm init (PARA INSTALAR LAS COSAS)
+3. npm run dev (PARA CORRER EL BACKEND)
 
-## License
-This project is licensed under the MIT License - see the LICENSE file for details.
+PD: los usuarios son inspector1@ejemplo.com, apoderado1@ejemplo.com, admin1@ejemplo.com. La contraseña de todos es "test" sin comillas.

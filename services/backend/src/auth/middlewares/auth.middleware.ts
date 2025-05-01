@@ -54,7 +54,6 @@ export const authenticate = (roles: string[] = []) => {
 };
 
 // Middleware for specific roles
-// Ensure the role names ('ADMIN', 'INSPECTOR', 'PARENT') match exactly what's in your database 'roles' table
 export const isAdmin = authenticate(['ADMIN']);
-export const isInspector = authenticate(['INSPECTOR']); // Make sure 'INSPECTOR' matches the role name in DB
+export const isInspector = authenticate(['INSPECTOR']);
 export const isParent = authenticate(['PARENT']);
