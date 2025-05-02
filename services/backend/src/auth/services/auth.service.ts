@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../../models/User';
-import config from '../../../config/env';
+import config from '../../config/env';
 
 class AuthService {
   async validateUser(email: string, password: string) {
