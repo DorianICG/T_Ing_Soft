@@ -8,7 +8,7 @@ interface SchemaParts {
 }
 
 const validate = (schemaParts: SchemaParts | Joi.ObjectSchema) => {
-  return (req: Request, res: Response, next: NextFunction) => { // Esta función interna debe devolver void
+  return (req: Request, res: Response, next: NextFunction): void => { 
     let schemaToValidate: SchemaParts;
 
     if (Joi.isSchema(schemaParts)) {
@@ -23,40 +23,56 @@ const validate = (schemaParts: SchemaParts | Joi.ObjectSchema) => {
       stripUnknown: true,
     };
 
-    // Validar body
+    let allErrors: { message: string; field: string; location: 'body' | 'query' | 'params' }[] = [];
+
     if (schemaToValidate.body) {
-      const { error: bodyError } = schemaToValidate.body.validate(req.body, options);
+      const { error: bodyError, value: validatedBody } = schemaToValidate.body.validate(req.body, options);
       if (bodyError) {
-        const errorMessage = bodyError.details.map((details) => details.message).join(', ');
-        // ---> NO uses 'return' aquí <---
-        res.status(400).json({ error: `Error de Validación (body): ${errorMessage}` });
-        return; // Puedes usar un return vacío para salir de la función si lo deseas
+        const bodyErrors = bodyError.details.map((detail) => ({
+          message: detail.message.replace(/['"]/g, ''),
+          field: detail.context?.key || 'unknown',
+          location: 'body' as const,
+        }));
+        allErrors = allErrors.concat(bodyErrors);
+      } else {
+         req.body = validatedBody;
       }
     }
 
-    // Validar query
     if (schemaToValidate.query) {
-      const { error: queryError } = schemaToValidate.query.validate(req.query, options);
+      const { error: queryError, value: validatedQuery } = schemaToValidate.query.validate(req.query, options);
       if (queryError) {
-        const errorMessage = queryError.details.map((details) => details.message).join(', ');
-         // ---> NO uses 'return' aquí <---
-        res.status(400).json({ error: `Error de Validación (query): ${errorMessage}` });
-        return; // Salir de la función
+        const queryErrors = queryError.details.map((detail) => ({
+            message: detail.message.replace(/['"]/g, ''),
+            field: detail.context?.key || 'unknown',
+            location: 'query' as const,
+        }));
+        allErrors = allErrors.concat(queryErrors);
+      } else {
+         req.query = validatedQuery;
       }
     }
 
-    // Validar params
     if (schemaToValidate.params) {
-      const { error: paramsError } = schemaToValidate.params.validate(req.params, options);
+      const { error: paramsError, value: validatedParams } = schemaToValidate.params.validate(req.params, options);
       if (paramsError) {
-        const errorMessage = paramsError.details.map((details) => details.message).join(', ');
-         // ---> NO uses 'return' aquí <---
-        res.status(400).json({ error: `Error de Validación (params): ${errorMessage}` });
-        return; // Salir de la función
+        const paramsErrors = paramsError.details.map((detail) => ({
+            message: detail.message.replace(/['"]/g, ''),
+            field: detail.context?.key || 'unknown',
+            location: 'params' as const,
+        }));
+        allErrors = allErrors.concat(paramsErrors);
+      } else {
+         req.params = validatedParams;
       }
     }
 
-    next(); // Validación exitosa
+    if (allErrors.length > 0) {
+        console.warn('Validation Error:', allErrors);
+        res.status(400).json({ errors: allErrors });
+    } else {
+        next();
+    }
   };
 };
 

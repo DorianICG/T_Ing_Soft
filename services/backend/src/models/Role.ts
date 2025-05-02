@@ -5,11 +5,9 @@ import sequelize from '../config/database';
   public name!: string;
   public description?: string | null; 
 
-  // Timestamps
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date; 
 
-  // --- Método estático para asociaciones ---
   public static associate(models: any) {
 
     Role.hasMany(models.User, { 

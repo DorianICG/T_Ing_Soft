@@ -40,7 +40,7 @@ User.init({
     primaryKey: true,
   },
   rut: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(10),
     allowNull: false,
     unique: true,
     field: 'rut', 
@@ -48,10 +48,7 @@ User.init({
   email: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    unique: true,
-    validate: {
-      isEmail: true,
-    },
+    unique: false,
     field: 'email',
   },
   passwordHash: { 
@@ -70,7 +67,9 @@ User.init({
     field: 'last_name', 
   },
   phone: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(15),
+    allowNull: false,
+    defaultValue: 'NO TIENE',
     field: 'phone', 
   },
   roleId: {
