@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+              "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="0.106667in" height="0.106667in"
+     viewBox="0 0 32 32">
+  <path id="A otro #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 26.16,17.68
+           C 26.16,17.68 29.82,17.67 29.82,17.67" />
+  <path id="A #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 31.00,20.10
+           C 31.00,20.00 28.00,13.99 28.00,13.99
+             28.00,13.99 25.01,20.00 25.01,20.10" />
+  <path id="T inferior segunda #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 22.00,13.49
+           C 22.00,13.49 22.00,20.00 22.00,20.00" />
+  <path id="T superior segunda #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 20.00,13.49
+           C 20.00,13.49 24.00,13.49 24.00,13.49" />
+  <path id="T inferior primera #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 16.00,13.51
+           C 16.00,13.51 16.00,20.00 16.00,20.00" />
+  <path id="T superior primera #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 14.00,13.50
+           C 14.00,13.50 17.99,13.50 17.99,13.50" />
+  <path id="I #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 11.01,13.00
+           C 11.01,13.00 11.02,19.99 11.02,19.99" />
+  <path id="Arriba R #1"
+        fill="none" stroke="black" stroke-width="1"
+        d="M 2.43,12.04
+           C 2.49,9.01 6.51,9.02 6.57,12.01" />
+  <path id="Abajo R #1"
+        fill="rgb(0, 0, 128)" stroke="none" stroke-width="0"
+        d="M 6.01,14.99
+           C 6.99,15.00 7.00,16.00 6.01,16.00
+             6.01,16.00 4.00,15.99 4.00,15.99
+             4.00,15.99 6.01,19.98 6.01,19.98
+             6.01,19.98 8.01,20.00 8.01,20.00
+             8.01,20.00 8.00,14.00 8.00,14.00
+             8.00,13.01 8.00,13.00 7.00,13.01
+             7.00,13.01 1.99,13.00 1.99,13.00
+             1.01,13.00 1.00,13.01 1.00,14.00
+             1.00,14.00 0.99,20.00 0.99,20.00
+             0.99,20.00 4.00,20.00 4.00,20.00
+             4.00,20.00 4.00,17.99 4.00,17.99
+             4.00,17.99 3.00,16.01 3.00,16.01
+             3.01,15.01 3.01,15.01 4.00,15.01
+             4.00,15.01 6.01,14.99 6.01,14.99 Z" />
+</svg>
