@@ -11,24 +11,24 @@ export default function HomeScreen() {
         <Text className="text-2xl font-bold text-blue-700 mb-3">Principal</Text>
         <OptionButton
           title="Generar Retiro"
-          onPress={() => router.push('/generarRetiro')}
+          onPress={() => router.navigate('/generarRetiro')}
         />
         <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
         <OptionButton
           title="Mis Alumnos"
-          onPress={() => router.push('/misAlumnos')}
+          onPress={() => router.navigate('/misAlumnos')}
         />
         <OptionButton
           title="Mis Delegados" 
-          onPress={() => router.push('/misDelegados')}
+          onPress={() => router.navigate('/misDelegados')}
         />
         <OptionButton
           title="Historial de Retiros"
-          onPress={() => router.push('/historialRetiros')}
+          onPress={() => router.navigate('/historialRetiros')}
         />
         <OptionButton
           title="Notificaciones"
-          onPress={() => router.push('/notificaciones')}
+          onPress={() => router.navigate('/notificaciones')}
           containerClassName="mb-0" 
         />
       </ScrollView>

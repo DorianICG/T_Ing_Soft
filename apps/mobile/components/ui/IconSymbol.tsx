@@ -19,6 +19,7 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'qrcode': 'qr-code',
   'person.fill': 'person',
+  'line.3.horizontal': 'menu',
 } as IconMapping;
 
 /**
