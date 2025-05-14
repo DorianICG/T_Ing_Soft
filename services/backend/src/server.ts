@@ -3,6 +3,7 @@ import cors from 'cors';
 import config from './config/env';
 import sequelize from './config/database';
 import authRoutes from './auth/routes/auth.routes';
+import adminRoutes from './admin/routes/admin.routes';
 
 const app = express();
 

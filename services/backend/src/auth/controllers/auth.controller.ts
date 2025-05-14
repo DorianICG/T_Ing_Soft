@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
-import { User, Role } from '../../models';
+import { User, Role as RoleModel } from '../../models';
+import type { RoleAttributes } from '../../models/Role';
 import config from '../../config/env';
 import { sendVerificationCode, sendPasswordResetEmail, sendUnlockEmail } from '../../utils/emailService';
 import { generateResetToken } from '../../utils/tokenHashing';
@@ -11,6 +12,32 @@ import { verifyRecaptchaV3 } from '../../utils/captcha';
 // Función para generar un código MFA de 6 dígitos
 const generateMfaCode = (): string => {
   return crypto.randomInt(100000, 999999).toString();
+};
+
+const getHighestPriorityRole = (roles: RoleAttributes[] | undefined | null): string | null => {
+  if (!roles || roles.length === 0) {
+    return null;
+  }
+  const roleHierarchy = ['ADMIN', 'INSPECTOR', 'PARENT']; 
+
+  let highestRole: string | null = null;
+  let highestPriority = -1;
+
+  for (const role of roles) {
+    if (role && role.name) {
+      const roleNameUpper = role.name.toUpperCase();
+      const priority = roleHierarchy.indexOf(roleNameUpper);
+      if (priority !== -1 && priority > highestPriority) {
+        highestPriority = priority;
+        highestRole = role.name; 
+      }
+    }
+  }
+  if (!highestRole && roles.length > 0 && roles[0]?.name) {
+      return null; 
+  }
+
+  return highestRole;
 };
 
 
@@ -22,7 +49,7 @@ class AuthController {
 
     try {
       console.log('1. Buscando usuario...');
-      const user = await User.findOne({ where: { rut }, include: [{ model: Role, as: 'role' }] });
+      const user = await User.findOne({ where: { rut }, include: [{ model: RoleModel, as: 'roles' }] });
       console.log('2. Usuario encontrado:', user ? user.rut : 'No encontrado');
 
       let needsCaptchaCheck = false;
@@ -41,10 +68,13 @@ class AuthController {
         console.log(`Verificación CAPTCHA v3 exitosa para ${rut}.`);
       }
 
-      if (!user || !user.role || !user.passwordHash) {
-        res.status(401).json({ error: 'RUT o contraseña incorrectos' });
+      const highestRoleName = user ? getHighestPriorityRole(user.roles) : null;
+
+      if (!user || !highestRoleName || !user.passwordHash) {
+        res.status(401).json({ error: 'RUT o contraseña incorrectos, o usuario sin rol asignado válido.' });
         return;
       }
+
       console.log('3. Comparando contraseña...');
       const isMatch = await bcrypt.compare(password, user.passwordHash);
       console.log('4. Contraseña coincide:', isMatch);
@@ -114,22 +144,34 @@ class AuthController {
         return; 
       }
 
+      if (user.lastLogin === null) {
+        console.log(`Usuario ${user.rut} está iniciando sesión por primera vez (lastLogin es null). Requiere cambio de contraseña.`);
+        const tempChangeTokenPayload = { id: user.id, action: 'force-change-password' };
+        const tempChangeToken = jwt.sign(tempChangeTokenPayload, config.JWT_SECRET as string, { expiresIn: '15m' });
+
+        res.status(200).json({
+          message: 'Primer inicio de sesión. Se requiere cambio de contraseña.',
+          forceChangePassword: true,
+          email: user.email, 
+          tempToken: tempChangeToken
+        });
+        return;
+      }
+
       if (user.email === "NO TIENE") {
         console.log(`Usuario ${user.rut} no tiene email registrado ("NO TIENE"). Saltando MFA y completando login.`);
         await user.update({ failedLoginAttempts: 0, lastFailedLogin: null, lastLogin: new Date() });
 
-        const userRole = user.role;
-        const jwtPayload = { id: user.id, role: userRole.name, email: user.email, rut: user.rut };
+        const jwtPayload = { id: user.id, role: highestRoleName, email: user.email, rut: user.rut };
         const jwtSecret: Secret = config.JWT_SECRET as string;
         const jwtOptions: SignOptions = { expiresIn: config.JWT_EXPIRES_IN };
         const token = jwt.sign(jwtPayload, jwtSecret, jwtOptions);
-
         res.json({
           message: 'Autenticación exitosa.',
           token,
-          user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: userRole.name, rut: user.rut },
+          user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: highestRoleName, rut: user.rut },
         });
-        return; 
+        return;
       }
 
       console.log('Contraseña correcta. Iniciando flujo MFA...');
@@ -162,8 +204,9 @@ class AuthController {
 
     try {
       console.log(`Verificando MFA para ${email} con código ${code}`);
-      const user = await User.findOne({ where: { email }, include: [{ model: Role, as: 'role' }] });
-       if (!user || !user.role) {
+      const user = await User.findOne({ where: { email }, include: [{ model: RoleModel, as: 'roles' }] });
+      const highestRoleName = user ? getHighestPriorityRole(user.roles) : null;
+      if (!user || !highestRoleName) {
         res.status(404).json({ error: 'Usuario no encontrado' });
         return;
       }
@@ -183,10 +226,9 @@ class AuthController {
       }
       console.log('Código MFA correcto. Completando login.');
       await user.update({ mfaCodeHash: null, mfaCodeExpiresAt: null, lastLogin: new Date() });
-      const userRole = user.role;
       const jwtPayload = {
           id: user.id,
-          role: userRole.name,
+          role: highestRoleName,
           email: user.email,
           rut: user.rut
       };
@@ -203,7 +245,7 @@ class AuthController {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            role: userRole.name,
+            role: highestRoleName,
             rut: user.rut
         },
       });
@@ -211,6 +253,114 @@ class AuthController {
     } catch (error) {
       console.error('Error en verificación MFA:', error);
       res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  }
+
+  async forceChangePassword(req: Request, res: Response): Promise<void> {
+    const { newPassword, confirmPassword } = req.body;
+    // Asumiendo que verifyForceChangeToken adjunta { id: number, action: string } a req.user
+    const userPayload = (req as any).user as { id: number; action?: string };
+    const userId = userPayload?.id;
+
+    if (!userId) {
+        res.status(401).json({ error: 'Token inválido o ausente para cambio de contraseña.' });
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      res.status(400).json({ error: 'Las contraseñas no coinciden.' });
+      return;
+    }
+
+    try {
+      let user = await User.findByPk(userId); // 'let' para poder reasignar después de recargar
+      if (!user) {
+        res.status(404).json({ error: 'Usuario no encontrado.' });
+        return;
+      }
+
+      const rutWithoutDV = user.rut.split('-')[0];
+      if (newPassword === rutWithoutDV) {
+          res.status(400).json({ error: 'La nueva contraseña no puede ser igual a la contraseña por defecto (su RUT sin dígito verificador).' });
+          return;
+      }
+
+      const saltRounds = 10;
+      const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+      await user.update({
+        passwordHash,
+        lastLogin: new Date(),
+        failedLoginAttempts: 0,
+        lastFailedLogin: null,
+        resetPasswordTokenHash: null, 
+        resetPasswordExpiresAt: null
+      });
+
+      console.log(`Contraseña actualizada para usuario ID ${userId}. Procediendo con el flujo post-cambio.`);
+
+      const updatedUser = await User.findByPk(userId, { include: [{ model: RoleModel, as: 'roles' }] });
+      const highestRoleName = updatedUser ? getHighestPriorityRole(updatedUser.roles) : null;
+      
+      if (!updatedUser || !highestRoleName) {
+        console.error(`Error crítico: Usuario ID ${userId} no encontrado después de actualizar contraseña.`);
+        res.status(500).json({ error: 'Error al procesar la solicitud después del cambio de contraseña.' });
+        return;
+      }
+
+      if (updatedUser.email && updatedUser.email !== "NO TIENE") {
+        console.log(`Usuario ${updatedUser.rut} tiene email. Iniciando flujo MFA post-cambio de contraseña.`);
+        const mfaCode = generateMfaCode();
+        const mfaSaltRounds = 10;
+        const mfaCodeHash = await bcrypt.hash(mfaCode, mfaSaltRounds);
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos de validez
+
+        await updatedUser.update({
+          mfaCodeHash: mfaCodeHash,
+          mfaCodeExpiresAt: expiresAt
+        });
+
+        try {
+          await sendVerificationCode(updatedUser.email, mfaCode);
+          console.log(`Código MFA enviado a ${updatedUser.email} post-cambio de contraseña.`);
+          res.status(200).json({
+            message: 'Contraseña actualizada. Se requiere verificación MFA.',
+            mfaRequired: true,
+            email: updatedUser.email
+          });
+        } catch (emailError) {
+          console.error("Error al enviar email MFA post-cambio de contraseña:", emailError);
+          res.status(500).json({ error: 'Contraseña actualizada, pero ocurrió un error al enviar el código de verificación. Intente iniciar sesión.' });
+        }
+      } else {
+        console.log(`Usuario ${updatedUser.rut} no tiene email. Completando login post-cambio de contraseña.`);
+        const jwtPayload = {
+            id: updatedUser.id,
+            role: highestRoleName,
+            email: updatedUser.email,
+            rut: updatedUser.rut
+        };
+        const jwtSecret: Secret = config.JWT_SECRET as string;
+        const jwtOptions: SignOptions = { expiresIn: config.JWT_EXPIRES_IN };
+        const token = jwt.sign(jwtPayload, jwtSecret, jwtOptions);
+
+        res.json({
+          message: 'Contraseña actualizada y autenticación exitosa.',
+          token,
+          user: {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            role: highestRoleName,
+            rut: updatedUser.rut
+          },
+        });
+      }
+
+    } catch (error) {
+      console.error('Error en forceChangePassword:', error);
+      res.status(500).json({ error: 'Error interno del servidor al cambiar la contraseña.' });
     }
   }
 

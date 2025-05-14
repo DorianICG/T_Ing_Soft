@@ -112,6 +112,18 @@ export const resetPasswordSchema = Joi.object({
   newPassword: passwordSchema,
 });
 
+export const forceChangePasswordSchema = Joi.object({
+  newPassword: passwordSchema,
+  confirmPassword: Joi.string()
+    .required()
+    .valid(Joi.ref('newPassword'))
+    .messages({
+      'any.only': 'Las contraseñas no coinciden.',
+      'string.empty': 'La confirmación de contraseña es requerida.',
+      'any.required': 'La confirmación de contraseña es requerida.',
+    }),
+});
+
 export const registerSchema = Joi.object({
   email: emailSchema,
   password: passwordSchema, 

@@ -1,0 +1,66 @@
+ADM RF-007 Administración de perfiles
+El administrador debe poder crear, modificar, eliminar y desactivar los
+siguientes perfiles de usuario desde una interfaz centralizada.
+- Apoderado:
+- Nombre (Varchar 50)
+- Apellidos (Varchar 50)
+- Rut (Varchar 10)
+- Correo (Varchar 100)
+- Teléfono (Integer 15)
+- Contraseña (Varchar 255)
+
+- Inspectores:
+- Nombre (Varchar 50)
+- Apellidos (Varchar 50)
+- Rut (Varchar 10)
+- Correo (Varchar 100)
+- Teléfono (Integer 15)
+- Contraseña (Varchar 255)
+
+- Administradores:
+- Nombre (Varchar 50)
+- Apellidos (Varchar 50)
+- Rut (Varchar 10)
+- Correo (Varchar 100)
+- Teléfono (Integer 15)
+- Contraseña (Varchar 255)
+
+- Alumnos:
+- Nombre (Varchar 25)
+- Apellidos (Varchar 25)
+- Rut (Varchar 9)
+- Fecha de nacimiento (Date)
+PD: validar campos obligatorios y formatos.
+
+
+
+ADM RF-008 Asignación de alumnos/as
+El sistema debe permitir al administrador vincular apoderados con alumnos
+mediante el rut. Se incluirá validación de RUT.
+
+
+
+ADM RF-009
+Importación masiva de
+usuarios
+Se debe permitir la carga de usuarios desde archivos CSV, el archivo debe
+contener el siguiente formato:
+Para alumnos:
+- Columna 1: Nombres
+- Columna 2: Apellidos
+- Columna 3: RUT del alumno
+- Columna 4: Fecha de nacimiento (dd-mm-YYYY)
+- Columna 6: RUT apoderado
+
+Para apoderados
+- Columna 1: Primer nombre, segundo nombre
+- Columna 2: Apellido paterno, apellido materno
+- Columna 3: RUT
+- Columna 4: Correo
+- Columna 5: Teléfono
+
+Para funcionarios
+- Columna 1: Primer nombre, segundo nombre
+- Columna 2: Apellido paterno, apellido materno
+- Columna 3: RUT
+PD: Validar datos antes de importar

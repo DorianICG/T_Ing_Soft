@@ -41,7 +41,7 @@ const config: AppConfig = {
   EMAIL_SECURE: process.env.EMAIL_SECURE === 'true',
   EMAIL_USER: process.env.EMAIL_USER, 
   EMAIL_PASS: process.env.EMAIL_PASS, 
-  EMAIL_FROM: process.env.EMAIL_FROM ?? '"KIDSAFE QR" <no-reply@kidsafeqr.com>',
+  EMAIL_FROM: process.env.EMAIL_FROM ?? '"RITTA" <no-reply@ritta.com>',
   
   RECAPTCHA_V3_SECRET_KEY: process.env.RECAPTCHA_V3_SECRET_KEY,
   RECAPTCHA_V3_THRESHOLD: parseFloat(process.env.RECAPTCHA_V3_THRESHOLD ?? '0.5') || 0.5,
