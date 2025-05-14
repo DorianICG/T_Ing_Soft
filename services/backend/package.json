@@ -1,7 +1,6 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -35,6 +34,8 @@
     "@types/cors": "^2.8.17",
     "@types/node": "^22.15.3",
     "@types/nodemailer": "^6.4.17",
+    "@types/uuid": "^10.0.0",
     "sequelize-cli": "^6.6.2"
-  }
+  },
+  "description": ""
 }

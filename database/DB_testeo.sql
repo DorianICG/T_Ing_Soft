@@ -184,6 +184,22 @@ CREATE TABLE IF NOT EXISTS public.withdrawals
     CONSTRAINT uq_withdrawals_qr_authorization_id UNIQUE (qr_authorization_id)
 );
 
+-- Crear el tipo ENUM con estados
+CREATE TYPE ticket_status AS ENUM ('open', 'in progress', 'closed');
+
+-- Crear la tabla support_tickets (para formularios de ayuda)
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    id_ticket SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    description TEXT NOT NULL, -- Descripción del problema
+    attachment VARCHAR(255), -- Ruta o nombre del archivo adjunto (opcional)
+    tracking_number VARCHAR(50) UNIQUE NOT NULL, -- Número de seguimiento único
+    status ticket_status DEFAULT 'open', -- Estado del ticket en inglés
+    admin_response TEXT, -- Respuesta del administrador (si aplica)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Fecha de creación
+    responded_at TIMESTAMP -- Fecha de respuesta
+);
+
 ALTER TABLE IF EXISTS public.courses
     ADD CONSTRAINT courses_organization_id_fkey FOREIGN KEY (organization_id)
     REFERENCES public.organizations (id) MATCH SIMPLE

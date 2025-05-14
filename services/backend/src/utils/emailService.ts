@@ -7,13 +7,12 @@ const transporter = nodemailer.createTransport({
   port: config.EMAIL_PORT,
   secure: config.EMAIL_SECURE,
   auth: {
-
     user: config.EMAIL_USER,
     pass: config.EMAIL_PASS,
   },
 });
 
-// Interfaz para las opciones del correo
+// Interfaz interna (opcional)
 interface MailOptions {
   to: string;
   subject: string;
@@ -21,29 +20,33 @@ interface MailOptions {
   html?: string;
 }
 
-// 2. Función genérica para enviar correos
-export const sendEmail = async (options: MailOptions): Promise<void> => {
+// 2 Función genérica para enviar correos en formato objeto
+async function sendEmailWithOptions(options: MailOptions): Promise<void> {
   try {
     if (!config.EMAIL_HOST || !config.EMAIL_USER || !config.EMAIL_PASS) {
-        console.error('Error: Configuración de email incompleta en variables de entorno.');
-        throw new Error('La configuración del servicio de email está incompleta.');
+      console.error('Error: Configuración de email incompleta en variables de entorno.');
+      throw new Error('La configuración del servicio de email está incompleta.');
     }
 
     const info = await transporter.sendMail({
-      from: config.EMAIL_FROM, 
-      to: options.to,         
-      subject: options.subject,  
-      text: options.text,     
-      html: options.html,     
+      from: config.EMAIL_FROM,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html,
     });
 
     console.log('Email sent successfully: %s', info.messageId);
-
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error('No se pudo enviar el correo electrónico.');
   }
-};
+}
+
+// 2.1 Funcion de correos para Support Tickets.
+export async function sendEmail(to: string, subject: string, text: string, html?: string): Promise<void> {
+  return sendEmailWithOptions({ to, subject, text, html });
+}
 
 // 3. Función específica para enviar el código de verificación MFA
 export const sendVerificationCode = async (email: string, code: string): Promise<void> => {
@@ -61,22 +64,16 @@ export const sendVerificationCode = async (email: string, code: string): Promise
     </div>
   `;
 
-  await sendEmail({
-    to: email,
-    subject: subject,
-    text: textBody,
-    html: htmlBody, 
-  });
+  await sendEmail(email, subject, textBody, htmlBody);
 };
 
-// 4. Función específica para enviar el correo de restablecimiento de contraseña
+// 4. Función específica para restablecer contraseña
 export const sendPasswordResetEmail = async (email: string, resetToken: string): Promise<void> => {
-
   const frontendResetUrl = process.env.RESET_PASSWORD_URL || 'http://localhost:4200';
-  const resetUrl = `${frontendResetUrl}/reset-password?token=${resetToken}`; 
+  const resetUrl = `${frontendResetUrl}/reset-password?token=${resetToken}`;
   const subject = 'Restablecimiento de Contraseña';
   const textBody = `Hola,\n\nRecibiste este correo porque tú (o alguien más) solicitó restablecer la contraseña de tu cuenta.\n\n` +
-                   `Por favor, haz clic en el siguiente enlace o pégalo en tu navegador para completar el proceso (el enlace es válido por 24 horas):\n\n` +
+                   `Por favor, haz clic en el siguiente enlace o pégalo en tu navegador para completar el proceso (válido por 24 horas):\n\n` +
                    `${resetUrl}\n\n` +
                    `Si no solicitaste esto, por favor ignora este correo y tu contraseña permanecerá sin cambios.\n`;
   const htmlBody = `
@@ -97,15 +94,10 @@ export const sendPasswordResetEmail = async (email: string, resetToken: string):
     </div>
   `;
 
-  await sendEmail({
-    to: email,
-    subject: subject,
-    text: textBody,
-    html: htmlBody,
-  });
+  await sendEmail(email, subject, textBody, htmlBody);
 };
 
-// 5. Función específica para enviar el correo de desbloqueo de cuenta
+// 5. Función específica para desbloquear cuenta
 export const sendUnlockEmail = async (email: string, resetToken: string): Promise<void> => {
   const frontendResetUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
   const resetUrl = `${frontendResetUrl}/reset-password?token=${resetToken}`;
@@ -135,13 +127,13 @@ export const sendUnlockEmail = async (email: string, resetToken: string): Promis
     </div>
   `;
 
-  await sendEmail({
-    to: email,
-    subject: subject,
-    text: textBody,
-    html: htmlBody,
-  });
+  await sendEmail(email, subject, textBody, htmlBody);
+}
+
+// Exporta por defecto como antes
+export default {
+  sendEmail,
+  sendVerificationCode,
+  sendPasswordResetEmail,
+  sendUnlockEmail
 };
-
-
-export default { sendEmail, sendVerificationCode };

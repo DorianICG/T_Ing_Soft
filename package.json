@@ -1,0 +1,12 @@
+{
+  "name": "t_ing_soft",
+  "version": "1.0.0",
+  "description": "This repository contains the files and resources for our Software Engineering project, which includes a mobile and web application built with Expo, as well as a backend and database package.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
