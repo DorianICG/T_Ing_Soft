@@ -3,6 +3,8 @@ import { ScrollView, Text } from 'react-native';
 import GlobalBackground from '@/components/layout/GlobalBackground';
 import { useRouter } from 'expo-router';
 
+
+
 export default function HomeScreen() {
   const router = useRouter();
   return (
