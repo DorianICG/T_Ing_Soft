@@ -73,6 +73,8 @@ const roleNameSchema = Joi.string()
     'any.required': 'El rol es requerido',
   });
 
+  
+
 // --- User Schemas ---
 
 export const createUserSchema = Joi.object({
@@ -112,7 +114,12 @@ export const createUserSchema = Joi.object({
   }),
   isActive: Joi.boolean().optional().default(true).messages({
     'boolean.base': 'El estado activo debe ser un valor booleano.'
-  })
+  }),
+  organizationId: Joi.number().integer().positive().required().messages({
+    'number.base': 'El ID de la organización debe ser un número entero positivo.',
+    'number.positive': 'El ID de la organización debe ser un número entero positivo.',
+    'any.required': 'El ID de la organización es requerido.'
+  }),
 });
 
 // En updateUserSchema
@@ -125,6 +132,7 @@ export const updateUserSchema = Joi.object({
   password: strongPasswordSchema.optional(),
   roleName: roleNameSchema.optional(),
   isActive: Joi.boolean().optional(),
+  organizationId: Joi.number().integer().positive().optional(),
 }).min(1);
 
 // --- Student Schemas ---

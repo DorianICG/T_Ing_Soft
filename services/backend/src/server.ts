@@ -14,6 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Montar Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Ruta simple para verificar que el servidor está vivo
 app.get('/', (req, res) => {

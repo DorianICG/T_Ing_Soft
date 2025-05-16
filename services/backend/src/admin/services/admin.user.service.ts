@@ -1,17 +1,30 @@
 import bcrypt from 'bcrypt';
-import User, { UserCreationAttributes, UserAttributes } from '../../models/User'; 
-import Role from '../../models/Role';
-import { Op, FindOptions } from 'sequelize';
+import { User, Role, Organization, UserOrganizationRole } from '../../models';
+import { UserAttributes, UserCreationAttributes } from '../../models/User';
+import { AuthenticatedAdminUser } from '../middlewares/admin.auth.middleware'; 
+import sequelizeInstance from '../../config/database';
+import { FindOptions, Op } from 'sequelize';
+import { formatearRut } from '../../utils/rutValidator';
 
-interface UserCreationRequestData {
+export interface UserCreationRequestData {
+  rut: string;
+  email?: string;
+  password?: string;
   firstName: string;
   lastName: string;
-  rut: string;
-  email?: string; 
-  phone?: string; 
-  password?: string;
-  roleName: string;
+  phone?: string;
+  roleName: string; 
+  organizationId?: number;
   isActive?: boolean;
+}
+
+interface UserDataFromCSV {
+  rut?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  roleName?: string;
 }
 
 interface UserUpdateRequestData {
@@ -35,250 +48,162 @@ interface ListUsersFilters {
   search?: string;
 }
 
+export type ReturnedUserAttributes = Omit<UserAttributes, 'passwordHash'>;
+
 class AdminUserService {
-  async createUser(data: UserCreationRequestData): Promise<User> {
-    console.log(`Validando RUT: ${data.rut}`); 
-    const existingUserByRut = await User.findOne({ where: { rut: data.rut } });
+  async createUser(data: UserCreationRequestData, adminUser: AuthenticatedAdminUser): Promise<ReturnedUserAttributes> {
+    if (!adminUser || !adminUser.adminOrganizations || adminUser.adminOrganizations.length === 0) {
+        throw new Error("El usuario administrador no tiene organizaciones válidas asignadas o no se pudieron determinar.");
+    }
+
+    let targetOrganizationId: number;
+
+    if (adminUser.adminOrganizations.length === 1) {
+        targetOrganizationId = adminUser.adminOrganizations[0].id;
+        if (data.organizationId !== undefined && data.organizationId !== targetOrganizationId) {
+            throw new Error(`El administrador pertenece a una única organización (ID: ${targetOrganizationId}). El ID de organización proporcionado (${data.organizationId}) es incorrecto o no necesario.`);
+        }
+        console.log(`Administrador pertenece a una organización. Creando usuario en organización ID: ${targetOrganizationId}`);
+    } else { 
+        if (data.organizationId === undefined || data.organizationId === null) {
+            throw new Error("El administrador pertenece a múltiples organizaciones. Debe especificar un 'organizationId' para el nuevo usuario.");
+        }
+        const isValidOrgForAdmin = adminUser.adminOrganizations.some(org => org.id === data.organizationId);
+        if (!isValidOrgForAdmin) {
+            throw new Error(`El 'organizationId' (${data.organizationId}) proporcionado no corresponde a una organización válida para el administrador.`);
+        }
+        targetOrganizationId = data.organizationId;
+        console.log(`Administrador pertenece a múltiples organizaciones. Creando usuario en organización ID seleccionada: ${targetOrganizationId}`);
+    }
+
+    const formattedRut = formatearRut(data.rut);
+    if (!formattedRut.includes('-')) { 
+        throw new Error('El RUT proporcionado no tiene el formato esperado después de la normalización (ej: 12345678-9).');
+    }
+
+    console.log(`Validando RUT formateado: ${formattedRut}`);
+    const existingUserByRut = await User.findOne({ where: { rut: formattedRut } }); // Use formattedRut for check
     if (existingUserByRut) {
       console.log(`RUT encontrado: ${existingUserByRut.rut}, ID: ${existingUserByRut.id}`);
-      throw new Error(`El RUT '${data.rut}' ya está registrado.`); 
+      throw new Error(`El RUT '${formattedRut}' ya está registrado.`);
     }
-    console.log(`RUT ${data.rut} es único, procediendo...`);
+    console.log(`RUT ${formattedRut} es único, procediendo...`);
 
     let passwordToHash = data.password;
     if (!passwordToHash) {
-      const rutWithoutDV = data.rut.split('-')[0];
-      if (!rutWithoutDV) {
-        throw new Error('Formato de RUT inválido para generar contraseña por defecto.');
+      const rutParts = formattedRut.split('-');
+      if (rutParts.length > 0 && rutParts[0]) {
+        passwordToHash = rutParts[0];
+      } else {
+        throw new Error('Formato de RUT inválido para generar contraseña por defecto después de la normalización.');
       }
-      passwordToHash = rutWithoutDV;
     }
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(passwordToHash, saltRounds);
 
-    const role = await Role.findOne({ where: { name: data.roleName } });
-    if (!role) {
-      throw new Error(`Rol '${data.roleName}' no encontrado.`);
+    const roleForNewUser = await Role.findOne({ where: { name: data.roleName } });
+    if (!roleForNewUser) {
+      throw new Error(`Rol '${data.roleName}' para el nuevo usuario no encontrado.`);
     }
 
-    // Preparar atributos para la creación
+    const organizationInstanceForNewUser = await Organization.findByPk(targetOrganizationId);
+    if (!organizationInstanceForNewUser) {
+        throw new Error(`Organización con ID '${targetOrganizationId}' no encontrada. Esto no debería ocurrir si la validación previa fue correcta.`);
+    }
+
     const creationAttributes: UserCreationAttributes = {
-      rut: data.rut,
+      rut: formattedRut,
       email: (data.email && data.email.trim() !== '') ? data.email.trim() : 'NO TIENE',
       passwordHash,
       firstName: data.firstName,
       lastName: data.lastName,
       phone: (data.phone && data.phone.trim() !== '') ? data.phone.trim() : 'NO TIENE',
-      roleId: role.id,
       isActive: data.isActive !== undefined ? data.isActive : true,
       failedLoginAttempts: 0,
       accountLocked: false,
-      id: undefined,
-      lastLogin: null,
-      lastFailedLogin: null,
-      mfaCodeHash: null,
-      mfaCodeExpiresAt: null,
-      resetPasswordTokenHash: null,
-      resetPasswordExpiresAt: null,
     };
 
+    const t = await sequelizeInstance.transaction();
+
     try {
-      const newUser = await User.create(creationAttributes);
-      const result = newUser.toJSON();
-      delete (result as any).passwordHash;
-      return result as User;
+      const newUser = await User.create(creationAttributes, { transaction: t });
+      
+      await UserOrganizationRole.create({
+          userId: newUser.id,
+          organizationId: targetOrganizationId,
+          roleId: roleForNewUser.id,
+      }, { transaction: t });
+
+      await t.commit();
+
+      const userToReturn = newUser.toJSON() as UserAttributes;
+      const { passwordHash: omitPassword, ...returnedUser } = userToReturn; 
+      return returnedUser as ReturnedUserAttributes;
+
+
     } catch (error: any) {
-      if (error.name === 'SequelizeUniqueConstraintError') {
-        console.error('SequelizeUniqueConstraintError detectado:', JSON.stringify(error, null, 2));
-        let message = 'Error de unicidad. Uno de los campos ya existe.';
-        const constraint = error.original?.constraint;
-        const detail = error.original?.detail; // Contiene el detalle como "Ya existe la llave (email)=(...)"
-    
-        if (constraint) {
-          if (constraint.includes('email')) { // Como 'users_email_key'
-            message = `El email proporcionado ya está registrado. (${detail || constraint})`;
-          } else if (constraint.includes('rut')) { // Como 'users_rut_key'
-            message = `El RUT proporcionado ya está registrado. (${detail || constraint})`;
-          } else {
-            message = `Un campo viola una restricción de unicidad: ${constraint}. (${detail || ''})`;
-          }
-        } else if (error.errors && error.errors.length > 0) { // Fallback si 'constraint' no está pero 'errors' sí
-          const specificError = error.errors[0];
-          const field = specificError.path || 'desconocido';
-          const value = specificError.value || 'desconocido';
-          message = `Error de unicidad: El campo '${field}' con valor '${value}' ya existe.`;
-        }
-        // Si 'detail' existe y no se usó 'constraint', podría ser útil
-        else if (detail) {
-            message = `Error de unicidad: ${detail}`;
-        }
-        throw new Error(message);
+      await t.rollback();
+      console.error('Error al crear usuario y asignar rol/organización:', error);
+      if (error.message.includes('ya está registrado') || error.message.includes('no encontrado') || error.message.includes('organización') || error.message.includes('RUT') || error.message.includes('Rol')) {
+        throw error;
       }
-      console.error('Error al crear usuario en servicio:', error);
       throw new Error('Error interno al crear el usuario.');
     }
+  
   }
 
-  async updateUser(userId: number, data: UserUpdateRequestData): Promise<User | null> {
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return null;
+  async createUsersBulk(usersData: UserDataFromCSV[], adminUser: AuthenticatedAdminUser, selectedOrganizationId: number): Promise<any[]> {
+    const results = [];
+
+    if (!selectedOrganizationId) {
+        throw new Error("No se proporcionó un ID de organización para la carga masiva.");
+    }
+    
+    const isValidOrgForAdmin = adminUser.adminOrganizations?.some(org => org.id === selectedOrganizationId);
+    if (!isValidOrgForAdmin && adminUser.adminOrganizations && adminUser.adminOrganizations.length > 0) {
+        throw new Error(`La organización seleccionada (ID: ${selectedOrganizationId}) no es válida para el administrador actual.`);
     }
 
-    if (data.rut && data.rut !== user.rut) {
-      const existingUserByRut = await User.findOne({
-        where: { rut: data.rut, id: { [Op.ne]: userId } },
-      });
-      if (existingUserByRut) {
-        throw new Error(`El RUT '${data.rut}' ya está registrado por otro usuario.`);
+    for (const [index, userData] of usersData.entries()) {
+      try {
+        if (!userData.rut || !userData.firstName || !userData.lastName || !userData.roleName) {
+          results.push({ 
+            row: index + 2,
+            status: 'error', 
+            message: 'Faltan campos requeridos en el CSV (rut, firstName, lastName, roleName).',
+            data: userData 
+          });
+          continue;
+        }
+
+        const creationData: UserCreationRequestData = {
+          rut: String(userData.rut),
+          email: userData.email || undefined, 
+          password: undefined,
+          firstName: String(userData.firstName),
+          lastName: String(userData.lastName),
+          phone: userData.phone || undefined,
+          roleName: String(userData.roleName),
+          isActive: true,
+          organizationId: selectedOrganizationId, 
+        };
+
+        const newUser = await this.createUser(creationData, adminUser);
+        results.push({ row: index + 2, status: 'success', userId: newUser.id, rut: newUser.rut });
+
+      } catch (error: any) {
+        results.push({ 
+          row: index + 2, 
+          status: 'error', 
+          message: error.message || 'Error desconocido al procesar esta fila.',
+          data: userData 
+        });
       }
     }
-
-    const emailToValidateOnUpdate = (data.email && data.email.trim().toUpperCase() !== 'NO TIENE')
-      ? data.email.trim()
-      : null;
-
-    if (emailToValidateOnUpdate && emailToValidateOnUpdate !== user.email) {
-      const existingUserByEmail = await User.findOne({
-        where: { email: emailToValidateOnUpdate, id: { [Op.ne]: userId } },
-      });
-      if (existingUserByEmail) {
-        throw new Error(`El email '${emailToValidateOnUpdate}' ya está registrado por otro usuario.`);
-      }
-    }
-
-    const updatePayload: Partial<UserAttributes> = {}; 
-
-    if (data.firstName !== undefined) updatePayload.firstName = data.firstName;
-    if (data.lastName !== undefined) updatePayload.lastName = data.lastName;
-    if (data.rut !== undefined) updatePayload.rut = data.rut;
-    if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
-
-    if (data.email !== undefined) {
-      updatePayload.email = (data.email && data.email.trim() !== '') ? data.email.trim() : 'NO TIENE';
-    }
-    if (data.phone !== undefined) {
-      updatePayload.phone = (data.phone && data.phone.trim() !== '') ? data.phone.trim() : 'NO TIENE';
-    }
-
-    if (data.password) {
-      const saltRounds = 10;
-      updatePayload.passwordHash = await bcrypt.hash(data.password, saltRounds);
-    }
-
-    if (data.roleName) {
-      const role = await Role.findOne({ where: { name: data.roleName } });
-      if (!role) {
-        throw new Error(`Rol '${data.roleName}' no encontrado.`);
-      }
-      updatePayload.roleId = role.id; 
-    }
-
-    try {
-      await user.update(updatePayload);
-      const updatedUser = await User.findByPk(userId, {
-        attributes: { exclude: ['passwordHash'] },
-        include: [{ model: Role, as: 'role' }]
-      });
-      return updatedUser;
-    } catch (error: any) {
-      if (error.name === 'SequelizeUniqueConstraintError') {
-        const field = error.errors[0]?.path;
-        const value = error.errors[0]?.value;
-        throw new Error(`Error de unicidad al actualizar: El campo '${field}' con valor '${value}' ya existe.`);
-      }
-      console.error('Error al actualizar usuario en servicio:', error);
-      throw new Error('Error interno al actualizar el usuario.');
-    }
-  }
-  async getUserById(userId: number): Promise<User | null> {
-    const user = await User.findByPk(userId, {
-      attributes: { exclude: ['passwordHash'] },
-      include: [{ model: Role, as: 'role' }],
-    });
-    return user;
-  }
-
-  async getAllUsers(filters: ListUsersFilters): Promise<{ rows: User[]; count: number }> {
-    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'DESC', roleName, isActive, search } = filters;
-    const offset = (page - 1) * limit;
-
-    const whereConditions: any = {};
-    if (roleName) {
-      const role = await Role.findOne({ where: { name: roleName } });
-      if (role) {
-        whereConditions.roleId = role.id;
-      } else {
-        return { rows: [], count: 0 };
-      }
-    }
-    if (isActive !== undefined) {
-      whereConditions.isActive = isActive;
-    }
-    if (search) {
-      whereConditions[Op.or] = [
-        { firstName: { [Op.iLike]: `%${search}%` } },
-        { lastName: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-        { rut: { [Op.iLike]: `%${search}%` } },
-      ];
-    }
-
-    const validUserSortFields = ['id', 'firstName', 'lastName', 'email', 'rut', 'createdAt', 'updatedAt'];
-    let effectiveSortBy = sortBy;
-    if (!validUserSortFields.includes(sortBy)) {
-        console.warn(`sortBy field '${sortBy}' is not a recognized User field. Defaulting to 'createdAt'.`);
-        effectiveSortBy = 'createdAt';
-    }
-
-
-    const options: FindOptions = {
-      where: whereConditions,
-      offset,
-      limit,
-      order: [[effectiveSortBy, sortOrder]],
-      attributes: { exclude: ['passwordHash'] },
-      include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }],
-    };
-
-    const { rows, count } = await User.findAndCountAll(options);
-    return { rows, count };
-  }
-
-  async deactivateUser(userId: number): Promise<User | null> {
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return null;
-    }
-    await user.update({ isActive: false });
-    const deactivatedUser = await User.findByPk(userId, {
-        attributes: { exclude: ['passwordHash'] },
-        include: [{ model: Role, as: 'role' }]
-    });
-    return deactivatedUser;
-  }
-
-  async activateUser(userId: number): Promise<User | null> {
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return null;
-    }
-    await user.update({ isActive: true });
-    const activatedUser = await User.findByPk(userId, {
-        attributes: { exclude: ['passwordHash'] },
-        include: [{ model: Role, as: 'role' }]
-    });
-    return activatedUser;
-  }
-
-  async deleteUser(userId: number): Promise<boolean> {
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return false;
-    }
-    await user.destroy();
-    return true;
+    return results;
   }
 }
+
+
 
 export default new AdminUserService();

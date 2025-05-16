@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import adminControllerInstance, { AdminController as AdminControllerClass } from '../controllers/admin.controller';
-import { isAdmin } from '../../auth/middlewares/auth.middleware';
+import { Router, RequestHandler } from 'express';
+import adminControllerInstance, { AdminController as AdminControllerClass } from '../controllers/admin.controller';import { isAdmin } from '../middlewares/admin.auth.middleware'; 
+import { authenticateAndAttachUser, setActiveOrganization } from '../../access-control';
 import validate from '../../middlewares/validation.middleware';
 import {
   createUserSchema,
@@ -9,27 +9,16 @@ import {
   updateStudentSchema,
   listQuerySchema
 } from '../validators/admin.validator';
+import multer from 'multer';
 
+const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
+router.use(authenticateAndAttachUser); 
+router.use(setActiveOrganization);  
+router.use(isAdmin);    
 
-
-router.use(isAdmin);
-
-// Métodos de instancia (ahora usan el adminControllerInstance importado)
+// Métodos de instancia 
 router.post('/users', validate(createUserSchema), adminControllerInstance.createUser);
-router.get('/users/:id', adminControllerInstance.getUserById);
-router.put('/users/:id', validate(updateUserSchema), adminControllerInstance.updateUser);
-router.patch('/users/:id/deactivate', adminControllerInstance.deactivateUser);
-router.patch('/users/:id/activate', adminControllerInstance.activateUser);
-router.delete('/users/:id', adminControllerInstance.deleteUser);
-
-router.post('/students', validate(createStudentSchema), adminControllerInstance.createStudent);
-router.get('/students/:id', adminControllerInstance.getStudentById);
-router.put('/students/:id', validate(updateStudentSchema), adminControllerInstance.updateStudent);
-router.delete('/students/:id', adminControllerInstance.deleteStudent);
-
-// Métodos estáticos llamados desde la CLASE (AdminControllerClass)
-router.get('/users', validate({ query: listQuerySchema }), AdminControllerClass.getAllUsers);
-router.get('/students', validate({ query: listQuerySchema }), AdminControllerClass.getAllStudents);
+router.post('/users/bulk', upload.single('file'), adminControllerInstance.createUsersBulk);
 
 export default router;

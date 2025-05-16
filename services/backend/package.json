@@ -14,6 +14,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@types/multer": "^1.4.12",
+    "@types/papaparse": "^5.3.16",
     "@types/passport-jwt": "^4.0.1",
     "axios": "^1.9.0",
     "bcrypt": "^5.1.1",
@@ -24,7 +26,9 @@
     "express-validator": "^7.2.1",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.2",
     "nodemailer": "^6.10.1",
+    "papaparse": "^5.5.2",
     "passport": "^0.7.0",
     "pg": "^8.15.6",
     "pg-hstore": "^2.3.4",

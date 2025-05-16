@@ -1,50 +1,97 @@
 import { Request, Response, NextFunction } from 'express';
 import Joi from 'joi';
 import jwt, { JwtPayload } from 'jsonwebtoken';
-import config from '../../config/env'; 
-import { User, Role } from '../../models'; 
+import config from '../../config/env';
+import UserModel, { UserAttributes } from '../../models/User';
+import RoleModel, { RoleAttributes } from '../../models/Role';
+import OrganizationModel, { OrganizationAttributes } from '../../models/Organization';
+import UserOrganizationRoleModel, { UserOrganizationRoleAttributes } from '../../models/UserOrganizationRole';
 
-
-
-interface AuthenticatedRequest extends Request {
-  user?: User; 
+export interface AuthenticatedAdminUser extends UserAttributes {
+  organizationRoleEntries?: (UserOrganizationRoleAttributes & {
+      role?: RoleAttributes;
+      organization?: OrganizationAttributes;
+  })[];
+  adminOrganizations?: OrganizationAttributes[];
 }
 
-export const isAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export interface AuthenticatedAdminRequest extends Request {
+  user?: AuthenticatedAdminUser;
+}
+
+export const isAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Acceso no autorizado. Token no proporcionado.' });
+    res.status(401).json({ error: 'Acceso no autorizado. Token no proporcionado.' });
+    return;
   }
 
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as JwtPayload;
+    const decoded = jwt.verify(token, config.JWT_SECRET as string) as JwtPayload & { id: number };
 
-    if (!decoded || typeof decoded.id !== 'number') {
-        return res.status(401).json({ error: 'Token inválido.' });
-    }
-
-    const user = await User.findByPk(decoded.id, {
-        include: [{ model: Role, as: 'role' }]
+    const userInstance = await UserModel.findByPk(decoded.id, {
+        include: [{
+            model: UserOrganizationRoleModel,
+            as: 'organizationRoleEntries',
+            required: false,
+            include: [
+                { model: RoleModel, as: 'role', attributes: ['id', 'name'] },
+                { model: OrganizationModel, as: 'organization', attributes: ['id', 'name'] }
+            ]
+        }]
     });
 
-    if (!user || !user.role || user.role.name !== 'Administrador' || !user.isActive) {
-      return res.status(403).json({ error: 'Acceso denegado. Se requiere rol de Administrador.' });
+    if (!userInstance || !userInstance.isActive) {
+      res.status(403).json({ error: 'Acceso denegado. Usuario inactivo o no encontrado.' });
+      return;
     }
 
-    req.user = user;
+    const adminEntriesFromInstance = userInstance.organizationRoleEntries?.filter(
+        entry => entry.role && entry.role.name === 'ADMIN'
+    );
+
+    if (!adminEntriesFromInstance || adminEntriesFromInstance.length === 0) {
+      res.status(403).json({ error: 'Acceso denegado. Se requiere rol de Administrador activo en al menos una organización.' });
+      return;
+    }
+
+    const plainUserAttributes = userInstance.get({ plain: true }) as UserAttributes;
+
+    const populatedAdminEntries = adminEntriesFromInstance.map(entry => {
+        const plainEntry = entry.get({ plain: true }) as UserOrganizationRoleAttributes;
+        const plainRole = entry.role?.get({ plain: true }) as RoleAttributes | undefined;
+        const plainOrganization = entry.organization?.get({ plain: true }) as OrganizationAttributes | undefined;
+        return {
+            ...plainEntry,
+            role: plainRole,
+            organization: plainOrganization,
+        };
+    });
+
+    const adminOrgs = adminEntriesFromInstance
+        .map(entry => entry.organization?.get({ plain: true }))
+        .filter(org => org !== undefined) as OrganizationAttributes[];
+
+    (req as AuthenticatedAdminRequest).user = {
+        ...plainUserAttributes,
+        organizationRoleEntries: populatedAdminEntries,
+        adminOrganizations: adminOrgs,
+    };
+    
     next();
   } catch (error) {
     console.error('Error de autenticación de administrador:', error);
     if (error instanceof jwt.TokenExpiredError) {
-        return res.status(401).json({ error: 'Token expirado.' });
+        res.status(401).json({ error: 'Token expirado.' });
+    } else if (error instanceof jwt.JsonWebTokenError) {
+        res.status(401).json({ error: 'Token inválido.' });
+    } else {
+        res.status(401).json({ error: 'Acceso no autorizado.' });
     }
-    if (error instanceof jwt.JsonWebTokenError) {
-        return res.status(401).json({ error: 'Token inválido.' });
-    }
-    return res.status(401).json({ error: 'Acceso no autorizado.' });
+    return;
   }
 };
 
@@ -60,7 +107,7 @@ export default function validate(schemaSource: any) {
     let validatedData: { [key: string]: any } = {};
 
     if (schemaSource.query) {
-      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false }); // stripUnknown: false para query
+      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false }); 
       if (error) {
         errors = errors.concat(error.details);
       } else {
@@ -69,7 +116,7 @@ export default function validate(schemaSource: any) {
     }
 
     if (schemaSource.query) {
-      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false }); // stripUnknown: false para query
+      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false }); 
       if (error) {
         errors = errors.concat(error.details);
       } else {

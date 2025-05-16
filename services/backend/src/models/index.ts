@@ -1,7 +1,6 @@
 import { Sequelize } from 'sequelize';
 import sequelizeInstance from '../config/database';
 
-// Importar clases y funciones de inicialización
 import UserClass, { initUserModel } from './User';
 import RoleClass, { initRoleModel } from './Role';
 import OrganizationClass, { initOrganizationModel } from './Organization';
