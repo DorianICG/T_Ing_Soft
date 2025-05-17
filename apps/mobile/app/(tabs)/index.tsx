@@ -9,13 +9,24 @@ export default function HomeScreen() {
   const router = useRouter();
   return (
     <GlobalBackground>
+      {/*Contenedor Principal tipo Scroll*/}
       <ScrollView className="flex-1 p-6 pt-10">
+
+        {/*Sección principal*/}
         <Text className="text-2xl font-bold text-blue-700 mb-3">Principal</Text>
+
         <OptionButton
           title="Generar Retiro"
           onPress={() => router.navigate('/generarRetiro')}
         />
+        <OptionButton
+          title="Validar Retiro"
+          onPress={() => router.navigate('/validarRetiro')}
+        />
+        
+        {/*Sección Opciones*/}
         <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
+
         <OptionButton
           title="Mis Alumnos"
           onPress={() => router.navigate('/misAlumnos')}

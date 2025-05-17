@@ -77,6 +77,13 @@ export default function TabLayout() {
             href: null,
           }}
         />
+        <Tabs.Screen
+          name="validarRetiro"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
+      
   );
 }
