@@ -36,7 +36,7 @@ const strongPasswordSchema = Joi.string()
 
 const emailSchema = Joi.string()
   .email({ minDomainSegments: 2, tlds: { allow: true } })
-  .allow(null, '', 'NO TIENE') // Allow empty, null, or "NO TIENE"
+  .allow(null, '', 'NO TIENE')
   .optional()
   .messages({
     'string.email': 'El correo electrónico debe tener un formato válido (ej. usuario@dominio.com)',
@@ -44,7 +44,7 @@ const emailSchema = Joi.string()
 
 const phoneSchema = Joi.string()
   .pattern(/^(?:\+?56)?(9\d{8})$/)
-  .allow(null, '', 'NO TIENE') // Allow empty, null, or "NO TIENE"
+  .allow(null, '', 'NO TIENE') 
   .optional()
   .messages({
     'string.pattern.base': 'El teléfono debe tener 9 dígitos (ej. 912345678) u opcionalmente +569...',
@@ -137,42 +137,56 @@ export const updateUserSchema = Joi.object({
 
 // --- Student Schemas ---
 
-const birthDateSchema = Joi.date()
-  .iso() // Expects YYYY-MM-DD
-  .required()
+const birthDateSchemaOptional = Joi.date()
+  .iso()
+  .allow(null, '')
+  .optional()
   .messages({
-    'date.base': 'La fecha de nacimiento debe ser una fecha válida.',
-    'date.format': 'La fecha de nacimiento debe estar en formato YYYY-MM-DD.',
-    'any.required': 'La fecha de nacimiento es requerida.',
-  });
+    'date.base': 'La fecha de nacimiento debe ser una fecha válida si se proporciona.',
+    'date.format': 'La fecha de nacimiento debe estar en formato YYYY-MM-DD si se proporciona.',
+    
+});
+
+const parentRutSchemaOptional = Joi.string()
+  .trim()
+  .allow(null, '')
+  .optional()
+  .custom((value, helpers) => {
+    if (value && value.trim() !== '' && !validarRut(value)) { 
+      return helpers.error('any.invalid', { message: `El RUT del padre no es válido o no tiene el formato correcto.` });
+    }
+    return (value && value.trim() !== '') ? formatearRut(value) : value;
+  })
+  .messages({
+    'any.invalid': `El RUT del padre no es válido o no tiene el formato correcto si se proporciona.`
+});
 
 export const createStudentSchema = Joi.object({
-  firstName: nameSchema('nombre', 50), 
-  lastName: nameSchema('apellidos', 50), 
-  rut: studentRutSchema,
-  birthDate: birthDateSchema,
-  organizationId: Joi.number().integer().positive().required().messages({ 
-    'number.base': 'ID de Organización debe ser un número.',
-    'number.positive': 'ID de Organización debe ser un número positivo.',
-    'any.required': 'ID de Organización es requerido.',
-  }),
-  parentId: Joi.number().integer().positive().required().messages({
-    'number.base': 'ID de Apoderado debe ser un número.',
-    'number.positive': 'ID de Apoderado debe ser un número positivo.',
-    'any.required': 'ID de Apoderado es requerido.',
-  }),
-});
+    rut: studentRutSchema,
+    firstName: nameSchema('nombre del estudiante', 50),
+    lastName: nameSchema('apellido del estudiante', 50),
+    birthDate: birthDateSchemaOptional,
+    courseId: Joi.number().integer().positive().required().messages({
+      'number.base': 'El ID del curso debe ser un número.',
+      'number.positive': 'El ID del curso debe ser un número entero positivo.',
+      'any.required': 'El ID del curso es obligatorio.',
+    }),
+    parentRut: parentRutSchemaOptional,
+    organizationId: Joi.number().integer().positive().optional().messages({
+      'number.base': 'ID de Organización debe ser un número.',
+      'number.positive': 'ID de Organización debe ser un número positivo.',
+    }),
+  });
 
 export const updateStudentSchema = Joi.object({
   firstName: nameSchema('nombre', 50).optional(),
   lastName: nameSchema('apellidos', 50).optional(),
   rut: rutBaseSchema('RUT del alumno').optional(), 
-  birthDate: birthDateSchema.optional(),
+  birthDate: birthDateSchemaOptional.optional(),
   organizationId: Joi.number().integer().positive().optional(),
   parentId: Joi.number().integer().positive().optional(),
 }).min(1);
 
-// Schema for query parameters (e.g., for listing users/students)
 export const listQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).optional().default(1),
   limit: Joi.number().integer().min(1).max(100).optional().default(10),

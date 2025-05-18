@@ -14,13 +14,13 @@ export interface StudentAttributes {
   lastName: string;
   birthDate: Date | null;
   organizationId: ForeignKey<Organization['id']>;
-  parentId: ForeignKey<User['id']>; // FK a users.id, columna parent_user_id
-  courseId: ForeignKey<Course['id']> | null;
+  parentId: ForeignKey<User['id']> | null;
+  courseId: ForeignKey<Course['id']>;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface StudentCreationAttributes extends Optional<StudentAttributes, 'id' | 'birthDate' | 'courseId' | 'createdAt' | 'updatedAt'> {}
+export interface StudentCreationAttributes extends Optional<StudentAttributes, 'id' | 'birthDate' | 'parentId' | 'createdAt' | 'updatedAt'> {} // <--- MODIFICADO: 'parentId' añadido a opcionales, 'courseId' quitado si se asume que siempre se proveerá
 
 class Student extends Model<StudentAttributes, StudentCreationAttributes> implements StudentAttributes {
   public id!: CreationOptional<number>;
@@ -29,14 +29,14 @@ class Student extends Model<StudentAttributes, StudentCreationAttributes> implem
   public lastName!: string;
   public birthDate!: Date | null;
   public organizationId!: ForeignKey<Organization['id']>;
-  public parentId!: ForeignKey<User['id']>;
-  public courseId!: ForeignKey<Course['id']> | null;
+  public parentId!: ForeignKey<User['id']> | null;
+  public courseId!: ForeignKey<Course['id']>;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
-  public readonly parent?: User;
-  public getParent!: BelongsToGetAssociationMixin<User>;
+  public readonly parent?: User | null;
+  public getParent!: BelongsToGetAssociationMixin<User | null>;
 
   public readonly organization?: Organization;
   public getOrganization!: BelongsToGetAssociationMixin<Organization>;
@@ -97,12 +97,12 @@ export const initStudentModel = () => {
         type: DataTypes.INTEGER, allowNull: false, field: 'organization_id',
         references: { model: 'organizations', key: 'id' }
       },
-      parentId: { // Atributo en el modelo
-        type: DataTypes.INTEGER, allowNull: false, field: 'parent_user_id', // Columna en la BD
+      parentId: { 
+        type: DataTypes.INTEGER, allowNull: true, field: 'parent_user_id',
         references: { model: 'users', key: 'id' }
       },
       courseId: {
-        type: DataTypes.INTEGER, allowNull: true, field: 'course_id',
+        type: DataTypes.INTEGER, allowNull: false, field: 'course_id',
         references: { model: 'courses', key: 'id' }
       },
     },

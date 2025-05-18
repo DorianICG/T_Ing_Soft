@@ -13,10 +13,17 @@ export interface AuthenticatedAdminUser extends UserAttributes {
       organization?: OrganizationAttributes;
   })[];
   adminOrganizations?: OrganizationAttributes[];
+  activeOrganizationId?: number;
 }
 
 export interface AuthenticatedAdminRequest extends Request {
   user?: AuthenticatedAdminUser;
+  validatedData?: {
+    body?: any;
+    query?: any;
+    params?: any;
+  };
+  file?: Express.Multer.File; 
 }
 
 export const isAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -36,7 +43,7 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction): 
         include: [{
             model: UserOrganizationRoleModel,
             as: 'organizationRoleEntries',
-            required: false,
+            required: false, 
             include: [
                 { model: RoleModel, as: 'role', attributes: ['id', 'name'] },
                 { model: OrganizationModel, as: 'organization', attributes: ['id', 'name'] }
@@ -49,36 +56,52 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    const adminEntriesFromInstance = userInstance.organizationRoleEntries?.filter(
+    const allUserOrgEntries = userInstance.organizationRoleEntries || [];
+
+    const adminSpecificEntries = allUserOrgEntries.filter(
         entry => entry.role && entry.role.name === 'ADMIN'
     );
 
-    if (!adminEntriesFromInstance || adminEntriesFromInstance.length === 0) {
+    if (adminSpecificEntries.length === 0) {
       res.status(403).json({ error: 'Acceso denegado. Se requiere rol de Administrador activo en al menos una organización.' });
       return;
     }
 
     const plainUserAttributes = userInstance.get({ plain: true }) as UserAttributes;
 
-    const populatedAdminEntries = adminEntriesFromInstance.map(entry => {
-        const plainEntry = entry.get({ plain: true }) as UserOrganizationRoleAttributes;
-        const plainRole = entry.role?.get({ plain: true }) as RoleAttributes | undefined;
-        const plainOrganization = entry.organization?.get({ plain: true }) as OrganizationAttributes | undefined;
-        return {
-            ...plainEntry,
-            role: plainRole,
-            organization: plainOrganization,
-        };
-    });
-
-    const adminOrgs = adminEntriesFromInstance
+    const adminOrganizationsList = adminSpecificEntries
         .map(entry => entry.organization?.get({ plain: true }))
         .filter(org => org !== undefined) as OrganizationAttributes[];
 
+    const allPopulatedEntries = allUserOrgEntries.map(entry => {
+        const plainEntry = entry.get({ plain: true }) as UserOrganizationRoleAttributes;
+        const plainRole = entry.role?.get({ plain: true }) as RoleAttributes | undefined;
+        const plainOrganization = entry.organization?.get({ plain: true }) as OrganizationAttributes | undefined;
+        return { ...plainEntry, role: plainRole, organization: plainOrganization };
+    });
+    
+    let currentActiveOrgId = (req as AuthenticatedAdminRequest).user?.activeOrganizationId;
+
+    if (currentActiveOrgId === undefined && adminOrganizationsList.length === 1) {
+      currentActiveOrgId = adminOrganizationsList[0].id;
+      console.log(`INFO: activeOrganizationId no estaba definido. Establecido automáticamente a la única organización de administración: ${currentActiveOrgId}`);
+    }
+    
+    if (currentActiveOrgId !== undefined) {
+      const isAdminInActiveOrg = adminSpecificEntries.some(
+          entry => entry.organizationId === currentActiveOrgId
+      );
+      if (!isAdminInActiveOrg) {
+          res.status(403).json({ error: `Acceso denegado. El usuario no es administrador en la organización activa seleccionada (ID: ${currentActiveOrgId}).` });
+          return;
+      }
+    }
+
     (req as AuthenticatedAdminRequest).user = {
-        ...plainUserAttributes,
-        organizationRoleEntries: populatedAdminEntries,
-        adminOrganizations: adminOrgs,
+      ...plainUserAttributes,
+      organizationRoleEntries: allPopulatedEntries,
+      adminOrganizations: adminOrganizationsList,
+      ...(currentActiveOrgId !== undefined && { activeOrganizationId: currentActiveOrgId })
     };
     
     next();
@@ -95,7 +118,7 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction): 
   }
 };
 
-export default function validate(schemaSource: any) { 
+export default function validate(schemaSource: { body?: Joi.Schema, query?: Joi.Schema, params?: Joi.Schema }) {
   return (req: Request, res: Response, next: NextFunction) => {
     const options = {
       abortEarly: false,
@@ -104,50 +127,50 @@ export default function validate(schemaSource: any) {
     };
 
     let errors: Joi.ValidationErrorItem[] = [];
-    let validatedData: { [key: string]: any } = {};
+    const validatedDataCollector: { body?: any, query?: any, params?: any } = {};
 
-    if (schemaSource.query) {
-      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false }); 
+    // Validar req.body
+    if (schemaSource.body) {
+      const { error, value } = schemaSource.body.validate(req.body, { ...options, stripUnknown: true }); // stripUnknown: true es común para body
       if (error) {
         errors = errors.concat(error.details);
       } else {
-        (req as any).validatedQuery = value; 
+        validatedDataCollector.body = value; 
       }
     }
 
+    // Validar req.query 
     if (schemaSource.query) {
-      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false }); 
+      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false });
       if (error) {
         errors = errors.concat(error.details);
       } else {
-        (req as any).validatedQuery = value; 
-        validatedData.query = value;
+        validatedDataCollector.query = value; 
       }
     }
 
+    // Validar req.params
     if (schemaSource.params) {
-      const { error, value } = schemaSource.params.validate(req.params, options);
+      const { error, value } = schemaSource.params.validate(req.params, options); 
       if (error) {
         errors = errors.concat(error.details);
       } else {
-        (req as any).validatedParams = value;
-        validatedData.params = value;
+        validatedDataCollector.params = value;
       }
     }
 
     if (errors.length > 0) {
       const formattedErrors = errors.map((err: Joi.ValidationErrorItem) => ({
-        message: err.message,
+        message: err.message.replace(/['"]/g, ''),
         field: err.path.join('.'),
-        location: schemaSource.body && err.context?.key && req.body.hasOwnProperty(err.context.key) ? 'body' :
-                    schemaSource.query && err.context?.key && req.query.hasOwnProperty(err.context.key) ? 'query' :
-                    schemaSource.params && err.context?.key && req.params.hasOwnProperty(err.context.key) ? 'params' : 'unknown',
+        location: schemaSource.body && validatedDataCollector.body && err.path.length > 0 && Object.prototype.hasOwnProperty.call(req.body, err.path[0]) ? 'body' :
+                    schemaSource.query && validatedDataCollector.query && err.path.length > 0 && Object.prototype.hasOwnProperty.call(req.query, err.path[0]) ? 'query' :
+                    schemaSource.params && validatedDataCollector.params && err.path.length > 0 && Object.prototype.hasOwnProperty.call(req.params, err.path[0]) ? 'params' : err.path[0] || 'unknown',
       }));
       return res.status(400).json({ errors: formattedErrors });
     }
 
-    (req as any).validatedData = validatedData;
-
+    (req as any).validatedData = validatedDataCollector;
     next();
   };
 }

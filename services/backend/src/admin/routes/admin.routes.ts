@@ -1,5 +1,6 @@
 import { Router, RequestHandler } from 'express';
-import adminControllerInstance, { AdminController as AdminControllerClass } from '../controllers/admin.controller';import { isAdmin } from '../middlewares/admin.auth.middleware'; 
+import adminControllerInstance, { AdminController as AdminControllerClass } from '../controllers/admin.controller';
+import { isAdmin } from '../middlewares/admin.auth.middleware'; 
 import { authenticateAndAttachUser, setActiveOrganization } from '../../access-control';
 import validate from '../../middlewares/validation.middleware';
 import {
@@ -17,8 +18,12 @@ router.use(authenticateAndAttachUser);
 router.use(setActiveOrganization);  
 router.use(isAdmin);    
 
+
 // Métodos de instancia 
 router.post('/users', validate(createUserSchema), adminControllerInstance.createUser);
 router.post('/users/bulk', upload.single('file'), adminControllerInstance.createUsersBulk);
+
+router.post('/students', validate(createStudentSchema), adminControllerInstance.createStudent);
+router.post('/students/bulk', upload.single('file'), adminControllerInstance.createStudentsBulk);
 
 export default router;

@@ -1,8 +1,9 @@
-import { Request, Response } from 'express';
+import e, { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt, { Secret, SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User, Role as RoleModel } from '../../models';
+import UserOrganizationRoleModel, { UserOrganizationRoleAttributes } from '../../models/UserOrganizationRole';
 import type { RoleAttributes } from '../../models/Role';
 import config from '../../config/env';
 import { sendVerificationCode, sendPasswordResetEmail, sendUnlockEmail } from '../../utils/emailService';
@@ -14,63 +15,166 @@ const generateMfaCode = (): string => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-const getHighestPriorityRole = (roles: RoleAttributes[] | undefined | null): string | null => {
-  if (!roles || roles.length === 0) {
+const getHighestPriorityRole = (
+  userOrgRoles: (UserOrganizationRoleAttributes & { role?: RoleAttributes })[] | undefined | null // Espera objetos planos
+): string | null => {
+  if (!userOrgRoles || userOrgRoles.length === 0) {
     return null;
   }
-  const roleHierarchy = ['ADMIN', 'INSPECTOR', 'PARENT']; 
+  const roleHierarchy = ['ADMIN', 'INSPECTOR', 'PARENT'];
+  let highestRoleName: string | null = null;
+  let highestPriorityIndex = roleHierarchy.length; 
 
-  let highestRole: string | null = null;
-  let highestPriority = -1;
+  console.log('DEBUG getHighestPriorityRole: userOrgRoles:', userOrgRoles);
 
-  for (const role of roles) {
-    if (role && role.name) {
-      const roleNameUpper = role.name.toUpperCase();
-      const priority = roleHierarchy.indexOf(roleNameUpper);
-      if (priority !== -1 && priority > highestPriority) {
-        highestPriority = priority;
-        highestRole = role.name; 
+  for (const entry of userOrgRoles) {
+    if (entry.role && entry.role.name) {
+      const roleNameUpper = entry.role.name.toUpperCase();
+      const priorityIndex = roleHierarchy.indexOf(roleNameUpper);
+      console.log(`DEBUG getHighestPriorityRole: roleNameUpper: ${roleNameUpper}, priorityIndex: ${priorityIndex}`);
+      if (priorityIndex !== -1 && priorityIndex < highestPriorityIndex) {
+        highestPriorityIndex = priorityIndex;
+        highestRoleName = entry.role.name; 
+        console.log(`DEBUG getHighestPriorityRole: Nueva prioridad más alta encontrada: ${highestRoleName}`);
       }
+    }else { 
+      console.log('DEBUG getHighestPriorityRole: entry.role o entry.role.name es nulo o indefinido.');
     }
   }
-  if (!highestRole && roles.length > 0 && roles[0]?.name) {
-      return null; 
-  }
-
-  return highestRole;
+  console.log(`DEBUG getHighestPriorityRole: Rol más alto encontrado: ${highestRoleName}`);
+  return highestRoleName;
 };
 
+interface IpAttemptInfo {
+  count: number;
+  firstAttemptTime: number;
+}
+
+const ipLoginAttempts = new Map<string, IpAttemptInfo>();
+const MAX_IP_ATTEMPTS_BEFORE_CAPTCHA = 2; 
+const IP_ATTEMPT_WINDOW_MS = 15 * 60 * 1000; 
+
+function recordFailedIpAttempt(ip: string): void {
+  const now = Date.now();
+  let attemptInfo = ipLoginAttempts.get(ip);
+
+  if (attemptInfo && (now - attemptInfo.firstAttemptTime) < IP_ATTEMPT_WINDOW_MS) {
+    attemptInfo.count++;
+  } else {
+    attemptInfo = { count: 1, firstAttemptTime: now };
+  }
+  ipLoginAttempts.set(ip, attemptInfo);
+  console.log(`IP ${ip} failed attempt. Current count in window: ${attemptInfo.count}`);
+}
+
+function getIpFailedAttempts(ip: string): number {
+  const now = Date.now();
+  const attemptInfo = ipLoginAttempts.get(ip);
+
+  if (attemptInfo && (now - attemptInfo.firstAttemptTime) < IP_ATTEMPT_WINDOW_MS) {
+    return attemptInfo.count;
+  }
+  return 0; 
+}
+
+function resetIpFailedAttempts(ip: string): void {
+  ipLoginAttempts.delete(ip);
+  console.log(`IP ${ip} successful login or action. Attempts reset.`);
+}
 
 // Controlador de autenticación
 class AuthController {
   async login(req: Request, res: Response): Promise<void> {
     const { rut, password, captchaToken } = req.body;
-
+    const clientIp = req.ip;
 
     try {
+      let ipNeedsCaptchaCheck = false;
+
+      if (clientIp) {
+        const currentIpFailedAttempts = getIpFailedAttempts(clientIp);
+        if (currentIpFailedAttempts >= MAX_IP_ATTEMPTS_BEFORE_CAPTCHA) {
+          ipNeedsCaptchaCheck = true;
+          console.log(`IP ${clientIp} has ${currentIpFailedAttempts} failed attempts. Requiring CAPTCHA.`);
+        }
+
+        if (ipNeedsCaptchaCheck) {
+          if (!captchaToken) {
+            console.log(`IP ${clientIp} requires CAPTCHA, but no token provided.`);
+            res.status(401).json({ error: 'Verificación de seguridad requerida. Por favor, completa el CAPTCHA.' });
+            return;
+          }
+          const isCaptchaValid = await verifyRecaptchaV3(captchaToken, 'login_ip_triggered', clientIp);
+          if (!isCaptchaValid) {
+            console.log(`IP ${clientIp} CAPTCHA v3 verification failed.`);
+            recordFailedIpAttempt(clientIp);
+            res.status(401).json({ error: 'Verificación de seguridad fallida. Inténtalo de nuevo.' });
+            return;
+          }
+          console.log(`IP ${clientIp} CAPTCHA v3 verification successful.`);
+        }
+      } else {
+        console.warn('Client IP is undefined. Skipping IP-based CAPTCHA checks.');
+      }
+
       console.log('1. Buscando usuario...');
-      const user = await User.findOne({ where: { rut }, include: [{ model: RoleModel, as: 'roles' }] });
+      const user = await User.findOne({
+        where: { rut },
+        include: [{
+          model: UserOrganizationRoleModel, 
+          as: 'organizationRoleEntries', 
+          required: false,               
+          include: [{
+            model: RoleModel,          
+            as: 'role', 
+            attributes: ['id', 'name']
+          }]
+        }]
+      });
       console.log('2. Usuario encontrado:', user ? user.rut : 'No encontrado');
 
-      let needsCaptchaCheck = false;
+      let userBasedCaptchaRequired = false; 
       if (user && user.failedLoginAttempts >= 2 && !user.accountLocked) {
-          needsCaptchaCheck = true;
-          console.log(`Intento ${user.failedLoginAttempts + 1} para RUT ${rut}. Requiere verificación CAPTCHA v3.`);
+          if (!ipNeedsCaptchaCheck) { 
+            userBasedCaptchaRequired = true;
+            console.log(`Intento ${user.failedLoginAttempts + 1} para RUT ${rut}. Requiere verificación CAPTCHA v3 (user-based).`);
+          }
       }
-      if (needsCaptchaCheck) {
-        const userIp = req.ip;
-        const isCaptchaValid = await verifyRecaptchaV3(captchaToken, 'login', userIp);
-        if (!isCaptchaValid) {
-          console.log(`Verificación CAPTCHA v3 fallida para ${rut}.`);
-          res.status(401).json({ error: 'Verificación de seguridad fallida. Inténtalo de nuevo.' });
+
+      if (userBasedCaptchaRequired) {
+        if (!captchaToken) {
+          console.log(`User ${rut} (user-based) requires CAPTCHA, but no token provided.`);
+          res.status(401).json({ error: 'Verificación de seguridad requerida. Por favor, completa el CAPTCHA.' });
           return;
         }
-        console.log(`Verificación CAPTCHA v3 exitosa para ${rut}.`);
+        if (clientIp) { 
+          const isCaptchaValid = await verifyRecaptchaV3(captchaToken, 'login_user_triggered', clientIp); 
+          if (!isCaptchaValid) {
+            console.log(`Verificación CAPTCHA v3 fallida para ${rut} (user-based).`);
+            recordFailedIpAttempt(clientIp); 
+            res.status(401).json({ error: 'Verificación de seguridad fallida. Inténtalo de nuevo.' });
+            return;
+          }
+          console.log(`Verificación CAPTCHA v3 exitosa para ${rut} (user-based).`);
+        } else {
+          console.warn(`User-based CAPTCHA for ${rut}: Client IP is undefined. Cannot reliably verify reCAPTCHA v3.`);
+          res.status(401).json({ error: 'No se pudo determinar la IP para la verificación de seguridad. Inténtalo de nuevo.' });
+          return;
+        }
       }
+      const plainOrganizationRoleEntriesForLogin = user?.organizationRoleEntries?.map(entry => {
+        const plainEntry = entry.get({ plain: true }) as UserOrganizationRoleAttributes;
+        const plainRole = entry.role?.get({ plain: true }) as RoleAttributes | undefined;
+        return { ...plainEntry, role: plainRole };
+      });
+      
+      console.log('DEBUG login: plainOrganizationRoleEntriesForLogin A PASAR a getHighestPriorityRole:', JSON.stringify(plainOrganizationRoleEntriesForLogin, null, 2));
 
-      const highestRoleName = user ? getHighestPriorityRole(user.roles) : null;
-
+      const highestRoleName = user ? getHighestPriorityRole(plainOrganizationRoleEntriesForLogin) : null;
       if (!user || !highestRoleName || !user.passwordHash) {
+        if (clientIp) {
+          recordFailedIpAttempt(clientIp);
+        }
         res.status(401).json({ error: 'RUT o contraseña incorrectos, o usuario sin rol asignado válido.' });
         return;
       }
@@ -80,6 +184,9 @@ class AuthController {
       console.log('4. Contraseña coincide:', isMatch);
 
       if (!isMatch) {
+        if (clientIp) {
+          recordFailedIpAttempt(clientIp);
+        }
         user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
         user.lastFailedLogin = new Date();
         let responseStatus = 401;
@@ -161,7 +268,9 @@ class AuthController {
       if (user.email === "NO TIENE") {
         console.log(`Usuario ${user.rut} no tiene email registrado ("NO TIENE"). Saltando MFA y completando login.`);
         await user.update({ failedLoginAttempts: 0, lastFailedLogin: null, lastLogin: new Date() });
-
+        if (clientIp) {
+          resetIpFailedAttempts(clientIp);
+        }
         const jwtPayload = { id: user.id, role: highestRoleName, email: user.email, rut: user.rut };
         const jwtSecret: Secret = config.JWT_SECRET as string;
         const jwtOptions: SignOptions = { expiresIn: config.JWT_EXPIRES_IN };
@@ -194,6 +303,9 @@ class AuthController {
       }
 
     } catch (error) {
+      if (clientIp) {
+        recordFailedIpAttempt(clientIp);
+      }
       console.error('Error en login:', error);
       res.status(500).json({ error: 'Error interno del servidor' });
     }
@@ -201,13 +313,22 @@ class AuthController {
 
   async verifyMfa(req: Request, res: Response): Promise<void> {
     const { email, code } = req.body;
-
     try {
       console.log(`Verificando MFA para ${email} con código ${code}`);
-      const user = await User.findOne({ where: { email }, include: [{ model: RoleModel, as: 'roles' }] });
-      const highestRoleName = user ? getHighestPriorityRole(user.roles) : null;
+      const user = await User.findOne({
+        where: { email },
+        include: [{ 
+          model: UserOrganizationRoleModel,
+          as: 'organizationRoleEntries',
+          required: false,
+          include: [{ model: RoleModel, as: 'role', attributes: ['id', 'name'] }]
+        }]
+      });
+
+      const highestRoleName = user ? getHighestPriorityRole(user.organizationRoleEntries as any) : null;
+
       if (!user || !highestRoleName) {
-        res.status(404).json({ error: 'Usuario no encontrado' });
+        res.status(404).json({ error: 'Usuario no encontrado o sin rol válido.' });
         return;
       }
       if (!user.mfaCodeHash || !user.mfaCodeExpiresAt || user.mfaCodeExpiresAt < new Date()) {
@@ -226,7 +347,10 @@ class AuthController {
       }
       console.log('Código MFA correcto. Completando login.');
       await user.update({ mfaCodeHash: null, mfaCodeExpiresAt: null, lastLogin: new Date() });
-      const jwtPayload = {
+      const clientIpForMfa = req.ip; 
+      if (clientIpForMfa) {
+        resetIpFailedAttempts(clientIpForMfa);
+      }      const jwtPayload = {
           id: user.id,
           role: highestRoleName,
           email: user.email,
@@ -258,7 +382,6 @@ class AuthController {
 
   async forceChangePassword(req: Request, res: Response): Promise<void> {
     const { newPassword, confirmPassword } = req.body;
-    // Asumiendo que verifyForceChangeToken adjunta { id: number, action: string } a req.user
     const userPayload = (req as any).user as { id: number; action?: string };
     const userId = userPayload?.id;
 
@@ -273,7 +396,7 @@ class AuthController {
     }
 
     try {
-      let user = await User.findByPk(userId); // 'let' para poder reasignar después de recargar
+      let user = await User.findByPk(userId);
       if (!user) {
         res.status(404).json({ error: 'Usuario no encontrado.' });
         return;
@@ -299,9 +422,22 @@ class AuthController {
 
       console.log(`Contraseña actualizada para usuario ID ${userId}. Procediendo con el flujo post-cambio.`);
 
-      const updatedUser = await User.findByPk(userId, { include: [{ model: RoleModel, as: 'roles' }] });
-      const highestRoleName = updatedUser ? getHighestPriorityRole(updatedUser.roles) : null;
-      
+      const updatedUser = await User.findByPk(userId, {
+        include: [{
+          model: UserOrganizationRoleModel,
+          as: 'organizationRoleEntries',
+          required: false,
+          include: [{ model: RoleModel, as: 'role', attributes: ['id', 'name'] }]
+        }]
+      });
+
+      const plainEntriesForController = updatedUser?.organizationRoleEntries?.map(entry => {
+        const plainEntry = entry.get({ plain: true }) as UserOrganizationRoleAttributes;
+        const plainRole = entry.role?.get({ plain: true }) as RoleAttributes | undefined;
+        return { ...plainEntry, role: plainRole };
+      });
+
+      const highestRoleName = updatedUser ? getHighestPriorityRole(plainEntriesForController) : null;      
       if (!updatedUser || !highestRoleName) {
         console.error(`Error crítico: Usuario ID ${userId} no encontrado después de actualizar contraseña.`);
         res.status(500).json({ error: 'Error al procesar la solicitud después del cambio de contraseña.' });

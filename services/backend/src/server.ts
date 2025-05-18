@@ -8,6 +8,7 @@ import adminRoutes from './admin/routes/admin.routes';
 const app = express();
 
 // Middlewares Esenciales
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
