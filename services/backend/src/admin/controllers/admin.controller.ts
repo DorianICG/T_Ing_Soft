@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import AdminUserService from '../services/admin.user.service';
+import AdminUserService, { UserCreationRequestData }from '../services/admin.user.service';
 import AdminStudentService, { CreateStudentData, RawStudentDataBulk } from '../services/admin.student.service';
 import { AuthenticatedAdminRequest, AuthenticatedAdminUser } from '../middlewares/admin.auth.middleware'; 
 import { matchedData } from 'express-validator'; 
@@ -10,32 +10,72 @@ export class AdminController {
   // CREAR USUARIO
   async createUser(req: Request, res: Response): Promise<void> {
     const adminReq = req as AuthenticatedAdminRequest;
-    const validatedBody = (adminReq as any).validatedData?.body;
+    const validatedData = req.body;
+
+    console.log('--- AdminController.createUser ---');
+    console.log('Raw req.body:', JSON.stringify(req.body, null, 2));
+
     try {
-      if (!adminReq.user) {
-        res.status(401).json({ error: 'Acceso no autorizado o información de administrador no disponible.' });
+      if (!adminReq.user || !adminReq.user.adminOrganizations) {
+        res.status(401).json({ error: 'Acceso no autorizado o información de administrador/organizaciones no disponible.' });
         return;
       }
       
-      if (!validatedBody) {
-        res.status(400).json({ error: 'Datos del cuerpo validados no encontrados después de la validación.' });
-        return;
+      const userPayload: UserCreationRequestData = {
+        rut: validatedData.rut,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        email: validatedData.email,
+        phone: validatedData.phone,
+        password: validatedData.password,
+        roleName: validatedData.roleName,
+        isActive: validatedData.isActive !== undefined ? validatedData.isActive : true,
+        organizationId: validatedData.organizationId ? parseInt(String(validatedData.organizationId), 10) : undefined,
+      };
+
+      console.log('User payload a enviar al servicio:', JSON.stringify(userPayload, null, 2)); // Mantener
+
+      const newUser = await AdminUserService.createUser(userPayload, adminReq.user);
+
+      console.log('--- AdminController: VALOR DE newUser ANTES DE res.json ---');
+      console.log(JSON.stringify(newUser, null, 2));
+          
+      try {
+          const newUserJson = JSON.stringify(newUser);
+          res.setHeader('Content-Type', 'application/json');
+          res.status(201).send(newUserJson); 
+      } catch (serializationError: any) {
+          console.error('--- ERROR SERIALIZING newUser ---', serializationError);
+          // No intentes enviar otra respuesta si los headers ya fueron enviados
+          if (!res.headersSent) {
+               res.status(500).json({ error: 'Error serializing user data for response.' });
+          }
       }
 
-      const user = await AdminUserService.createUser(validatedBody, adminReq.user);
-      res.status(201).json(user);
-
     } catch (error: any) {
-      console.error('Error creando usuario:', error);
-      if (error.message.includes('ya está registrado') ||
+      console.error('--- AdminController CATCH BLOCK ---');
+      console.error('Error Type:', typeof error);
+      console.error('Is Error Instance:', error instanceof Error);
+      console.error('Error Message:', error.message);
+      console.error('Error Stack:', error.stack);
+      console.error('Headers Sent Before Catch?:', res.headersSent);
+
+      if (res.headersSent) {
+        console.error('Headers were already sent. Cannot send new error response.');
+        return; 
+      }
+      
+      if (error.message && (error.message.includes('ya está registrado') ||
           error.message.includes('no encontrado') ||
           error.message.includes('organización') ||
-          error.message.includes('RUT') ||
-          error.message.includes('Rol')
-         ) {
+          error.message.includes('RUT') || 
+          error.message.includes('Rol') ||
+          error.message.toLowerCase().includes("debe especificar un 'organizationid'") ||
+          error.message.toLowerCase().includes("rut 'undefined'") 
+         )) {
         res.status(400).json({ error: error.message });
       } else {
-        res.status(500).json({ error: 'Error interno del servidor al crear usuario.' });
+        res.status(500).json({ error: 'Error interno del servidor al crear el usuario.' });
       }
     }
   }

@@ -5,15 +5,24 @@ import { validarRut, formatearRut} from '../../utils/rutValidator';
 const rutBaseSchema = (fieldName: string = 'RUT') => Joi.string()
   .trim()
   .custom((value, helpers) => {
+    // 1. Validar el RUT matemáticamente y estructuralmente
     if (!validarRut(value)) {
-      return helpers.error('any.invalid', { message: `El ${fieldName} no es válido o no tiene el formato correcto.` });
+      return helpers.error('any.invalid', { message: `El ${fieldName} no es válido (dígito verificador incorrecto o formato general inválido).` });
     }
-    return formatearRut(value);
+    
+    // 2. Si es válido, formatearlo al estándar CUERPO-DV
+    const rutFormateado = formatearRut(value);
+    
+    // 3. Salvaguarda: Verificar que el formateo produjo un resultado esperado (con guion)
+    if (!rutFormateado || !rutFormateado.includes('-')) {
+        return helpers.error('any.invalid', { message: `Error interno al formatear el ${fieldName} después de la validación.` });
+    }
+    
+    return rutFormateado; 
   })
-  .messages({
+  .messages({ 
     'string.empty': `El ${fieldName} es requerido.`,
     'any.required': `El ${fieldName} es requerido.`,
-    'any.invalid': `El ${fieldName} no es válido o no tiene el formato correcto.`
   });
 
 const rutSchema = rutBaseSchema('RUT')
@@ -62,6 +71,7 @@ const nameSchema = (fieldName: string, maxLength: number = 50) => Joi.string()
   });
 
 const validUserRoles = ['PARENT', 'INSPECTOR', 'ADMIN'];
+
 const roleNameSchema = Joi.string()
   .valid(...validUserRoles)
   .trim()
@@ -115,10 +125,9 @@ export const createUserSchema = Joi.object({
   isActive: Joi.boolean().optional().default(true).messages({
     'boolean.base': 'El estado activo debe ser un valor booleano.'
   }),
-  organizationId: Joi.number().integer().positive().required().messages({
+  organizationId: Joi.number().integer().positive().optional().messages({
     'number.base': 'El ID de la organización debe ser un número entero positivo.',
     'number.positive': 'El ID de la organización debe ser un número entero positivo.',
-    'any.required': 'El ID de la organización es requerido.'
   }),
 });
 
@@ -149,13 +158,20 @@ const birthDateSchemaOptional = Joi.date()
 
 const parentRutSchemaOptional = Joi.string()
   .trim()
-  .allow(null, '')
+  .allow(null, '') 
   .optional()
   .custom((value, helpers) => {
-    if (value && value.trim() !== '' && !validarRut(value)) { 
+    if (!value || value.trim() === '') {
+      return value; 
+    }
+    if (!validarRut(value)) { 
       return helpers.error('any.invalid', { message: `El RUT del padre no es válido o no tiene el formato correcto.` });
     }
-    return (value && value.trim() !== '') ? formatearRut(value) : value;
+    const rutFormateado = formatearRut(value);
+    if (!rutFormateado || !rutFormateado.includes('-')) {
+        return helpers.error('any.invalid', { message: `Error interno al formatear el RUT del padre después de la validación.` });
+    }
+    return rutFormateado;
   })
   .messages({
     'any.invalid': `El RUT del padre no es válido o no tiene el formato correcto si se proporciona.`

@@ -60,10 +60,7 @@ class AdminUserService {
 
     if (adminUser.adminOrganizations.length === 1) {
         targetOrganizationId = adminUser.adminOrganizations[0].id;
-        if (data.organizationId !== undefined && data.organizationId !== targetOrganizationId) {
-            throw new Error(`El administrador pertenece a una única organización (ID: ${targetOrganizationId}). El ID de organización proporcionado (${data.organizationId}) es incorrecto o no necesario.`);
-        }
-        console.log(`Administrador pertenece a una organización. Creando usuario en organización ID: ${targetOrganizationId}`);
+        console.log(`Administrador pertenece a una única organización. Creando usuario en la organización del administrador ID: ${targetOrganizationId}`);
     } else { 
         if (data.organizationId === undefined || data.organizationId === null) {
             throw new Error("El administrador pertenece a múltiples organizaciones. Debe especificar un 'organizationId' para el nuevo usuario.");
@@ -76,13 +73,17 @@ class AdminUserService {
         console.log(`Administrador pertenece a múltiples organizaciones. Creando usuario en organización ID seleccionada: ${targetOrganizationId}`);
     }
 
-    const formattedRut = formatearRut(data.rut);
-    if (!formattedRut.includes('-')) { 
-        throw new Error('El RUT proporcionado no tiene el formato esperado después de la normalización (ej: 12345678-9).');
-    }
+    const rutFromPayload = data.rut;
 
-    console.log(`Validando RUT formateado: ${formattedRut}`);
-    const existingUserByRut = await User.findOne({ where: { rut: formattedRut } }); // Use formattedRut for check
+    if (!rutFromPayload || typeof rutFromPayload !== 'string' || !rutFromPayload.includes('-')) {
+      console.error(`[AdminUserService.createUser] RUT inválido recibido del payload validado: '${rutFromPayload}'`);
+      throw new Error(`El RUT '${rutFromPayload}' (proveniente de la validación) no tiene el formato esperado (ej: 12345678-9). Es posible que la validación del RUT deba ser revisada.`);
+    }
+    
+    const formattedRut = rutFromPayload; 
+
+    console.log(`Validando RUT (ya formateado por Joi): ${formattedRut}`);
+    const existingUserByRut = await User.findOne({ where: { rut: formattedRut } });
     if (existingUserByRut) {
       console.log(`RUT encontrado: ${existingUserByRut.rut}, ID: ${existingUserByRut.id}`);
       throw new Error(`El RUT '${formattedRut}' ya está registrado.`);
@@ -130,7 +131,7 @@ class AdminUserService {
       
       await UserOrganizationRole.create({
           userId: newUser.id,
-          organizationId: targetOrganizationId,
+          organizationId: targetOrganizationId, 
           roleId: roleForNewUser.id,
       }, { transaction: t });
 
@@ -140,16 +141,14 @@ class AdminUserService {
       const { passwordHash: omitPassword, ...returnedUser } = userToReturn; 
       return returnedUser as ReturnedUserAttributes;
 
-
     } catch (error: any) {
       await t.rollback();
       console.error('Error al crear usuario y asignar rol/organización:', error);
       if (error.message.includes('ya está registrado') || error.message.includes('no encontrado') || error.message.includes('organización') || error.message.includes('RUT') || error.message.includes('Rol')) {
-        throw error;
+        throw error; 
       }
       throw new Error('Error interno al crear el usuario.');
     }
-  
   }
 
   async createUsersBulk(usersData: UserDataFromCSV[], adminUser: AuthenticatedAdminUser, selectedOrganizationId: number): Promise<any[]> {
