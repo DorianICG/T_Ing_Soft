@@ -5,19 +5,13 @@ import { validarRut, formatearRut} from '../../utils/rutValidator';
 const rutBaseSchema = (fieldName: string = 'RUT') => Joi.string()
   .trim()
   .custom((value, helpers) => {
-    // 1. Validar el RUT matemáticamente y estructuralmente
     if (!validarRut(value)) {
       return helpers.error('any.invalid', { message: `El ${fieldName} no es válido (dígito verificador incorrecto o formato general inválido).` });
     }
-    
-    // 2. Si es válido, formatearlo al estándar CUERPO-DV
     const rutFormateado = formatearRut(value);
-    
-    // 3. Salvaguarda: Verificar que el formateo produjo un resultado esperado (con guion)
     if (!rutFormateado || !rutFormateado.includes('-')) {
         return helpers.error('any.invalid', { message: `Error interno al formatear el ${fieldName} después de la validación.` });
     }
-    
     return rutFormateado; 
   })
   .messages({ 

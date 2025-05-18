@@ -46,7 +46,6 @@ export class AdminController {
           res.status(201).send(newUserJson); 
       } catch (serializationError: any) {
           console.error('--- ERROR SERIALIZING newUser ---', serializationError);
-          // No intentes enviar otra respuesta si los headers ya fueron enviados
           if (!res.headersSent) {
                res.status(500).json({ error: 'Error serializing user data for response.' });
           }

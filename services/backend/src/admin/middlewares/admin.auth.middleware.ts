@@ -131,7 +131,7 @@ export default function validate(schemaSource: { body?: Joi.Schema, query?: Joi.
 
     // Validar req.body
     if (schemaSource.body) {
-      const { error, value } = schemaSource.body.validate(req.body, { ...options, stripUnknown: true }); // stripUnknown: true es común para body
+      const { error, value } = schemaSource.body.validate(req.body, { ...options, stripUnknown: true });
       if (error) {
         errors = errors.concat(error.details);
       } else {

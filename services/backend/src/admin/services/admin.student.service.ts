@@ -65,7 +65,7 @@ class AdminStudentService {
       if (existingUser) {
         throw new Error('El RUT del estudiante ya está registrado como usuario.');
       }
-      const existingStudent = await Student.findOne({ where: { rut: formattedStudentRut, organizationId }, transaction: t }); // Asegúrate de verificar en la misma organización
+      const existingStudent = await Student.findOne({ where: { rut: formattedStudentRut, organizationId }, transaction: t }); 
       if (existingStudent) {
         throw new Error(`El RUT del estudiante ya está registrado como estudiante en la organización ID ${organizationId}.`);
       }
