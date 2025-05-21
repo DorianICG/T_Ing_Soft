@@ -16,7 +16,7 @@ export default function HomeScreen() {
         <Text className="text-2xl font-bold text-blue-700 mb-3">Principal</Text>
 
         <OptionButton
-          title="Generar Retiro"
+          title="Generar QR"
           onPress={() => router.navigate('/generarRetiro')}
         />
         <OptionButton
@@ -42,6 +42,12 @@ export default function HomeScreen() {
         <OptionButton
           title="Notificaciones"
           onPress={() => router.navigate('/notificaciones')}
+          containerClassName="mb-0" 
+        />
+
+        <OptionButton
+          title="Generar Retiro"
+          onPress={() => router.navigate('/retiro')}
           containerClassName="mb-0" 
         />
       </ScrollView>
