@@ -200,6 +200,26 @@ CREATE TABLE IF NOT EXISTS public.support_tickets (
     responded_at TIMESTAMP -- Fecha de respuesta
 );
 
+-- Crear la tabla para videos tutoriales
+CREATE TABLE IF NOT EXISTS public.tutorial_videos (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) COLLATE pg_catalog."default" NOT NULL,
+    description TEXT COLLATE pg_catalog."default",
+    url VARCHAR(500) COLLATE pg_catalog."default" NOT NULL, -- Puede ser URL o ruta local
+    duration_seconds INTEGER NOT NULL CHECK (duration_seconds <= 300), -- Máximo 5 minutos
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla que registra usuarios que vieron el tutorial
+CREATE TABLE IF NOT EXISTS public.user_tutorial_views (
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tutorial_video_id integer NOT NULL REFERENCES tutorial_videos(id) ON DELETE CASCADE,
+    viewed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT user_tutorial_views_pkey PRIMARY KEY (user_id, tutorial_video_id)
+);
+
 ALTER TABLE IF EXISTS public.courses
     ADD CONSTRAINT courses_organization_id_fkey FOREIGN KEY (organization_id)
     REFERENCES public.organizations (id) MATCH SIMPLE

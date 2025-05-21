@@ -4,6 +4,7 @@ import config from './config/env';
 import sequelize from './config/database';
 import authRoutes from './auth/routes/auth.routes';
 import adminRoutes from './admin/routes/admin.routes';
+import tutorialRoutes from './tutorial/routes/tutorial.routes';
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Montar Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/tutorials', tutorialRoutes);
 
 // Ruta simple para verificar que el servidor está vivo
 app.get('/', (req, res) => {

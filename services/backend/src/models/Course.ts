@@ -43,7 +43,7 @@ class Course extends Model<CourseAttributes, CourseCreationAttributes> implement
   }
 }
 
-export const initCourseModel = () => {
+export const initCourseModel = (sequelize: Sequelize) => {
   Course.init(
     {
       id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
