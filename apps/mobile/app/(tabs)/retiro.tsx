@@ -8,9 +8,10 @@ import {
 
 import GlobalBackground from '@/components/layout/GlobalBackground';
 import Icon from '@expo/vector-icons/Ionicons'; 
-
+import { useRouter } from 'expo-router';
 export default function SeleccionarPersonaScreen() {
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
+  const router = useRouter();
 
   const personas = [
     {
@@ -28,13 +29,8 @@ export default function SeleccionarPersonaScreen() {
   return (
     <GlobalBackground>
     <View className="flex-1 justify-center items-center px-5 max-w-[400px] mx-auto w-full">
-        {/* Encabezado */}
-        <Text className="text-xl font-bold text-blue-600 mb-4">
-            NOMBRE
-        </Text>
-
         {/* Pregunta */}
-        <Text className="text-lg text-center text-gray-700 mb-6">
+        <Text className="text-xl font-bold text-blue-600 mb-4">
           ¿A quién desea retirar?
         </Text>
 
@@ -47,10 +43,6 @@ export default function SeleccionarPersonaScreen() {
                 selectedPerson === persona.nombre ? 'border-blue-500' : ''
             }`}
             >
-            <Image
-                source={{ uri: persona.foto }}
-                className="w-6 h-8 rounded-full align-self-center mx-auto"
-            />
             <Text className="ml-6 text-base text-black flex-1">
                 {persona.nombre}
             </Text>
@@ -61,6 +53,11 @@ export default function SeleccionarPersonaScreen() {
         {/* Botón continuar */}
         <TouchableOpacity
           disabled={!selectedPerson}
+          onPress={() => {
+            if (selectedPerson) {
+              router.push('/encargadoRetiro'); 
+            }
+          }}
           className={`py-3 px-8 rounded-lg self-center flex-row items-center space-x-2 ${
             selectedPerson ? 'bg-blue-600' : 'bg-gray-300'
           }`}
