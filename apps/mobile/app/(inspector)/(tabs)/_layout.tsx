@@ -6,7 +6,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import '../../global.css'; 
+import '../../../global.css'; 
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -26,64 +26,26 @@ export default function TabLayout() {
         }),
       }}>
         <Tabs.Screen
-          name="index"
+          name="home"
           options={{
-            title: 'Home',
+            title: 'Inicio',
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
           }}
         />
         <Tabs.Screen
-          name="generarRetiro"
+          name="manual-entry"
           options={{
-            title: 'Retirar',
+            title: 'retiro manual',
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
           }}
         />
         <Tabs.Screen
-          name="perfil"
+          name="scanner"
           options={{
-            title: 'Perfil', 
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="explore" 
-          options={{
-            title: 'Explorar',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="line.3.horizontal" color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="misAlumnos"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="misDelegados"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="historialRetiros"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="notificaciones"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="validarRetiro"
-          options={{
-            href: null,
+            title: 'escanear',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
           }}
         />
       </Tabs>
-      
   );
 }
