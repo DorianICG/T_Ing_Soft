@@ -8,7 +8,9 @@ import '../global.css';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '../context/AuthContext'; 
 import { useEffect } from 'react';
-import { Text, View } from 'react-native'; 
+import { ActivityIndicator, Text, View, Image } from 'react-native'; 
+
+import images from '@/constants/images';
 
 // Prevenir que la splash screen se oculte automáticamente
 SplashScreen.preventAutoHideAsync();
@@ -35,7 +37,16 @@ function InitialLayout() {
   if (!fontsLoaded && !fontError || authLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Cargando Aplicación...</Text>
+        
+        <Image
+          source={images.logos.logoBlack}
+          style={{ width: 200, height: 200, marginBottom: 20 }}
+          resizeMode="contain"
+        />
+
+        <ActivityIndicator size="large" color="#1e3a8a" style={{ marginBottom: 20 }} />
+
+        <Text>Cargando...</Text>
       </View>
     );
   }
@@ -45,7 +56,7 @@ function InitialLayout() {
   // Pero para la navegación principal basada en autenticación, Slot es suficiente.
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

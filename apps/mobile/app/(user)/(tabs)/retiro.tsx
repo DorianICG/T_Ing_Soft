@@ -1,73 +1,83 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-} from 'react-native';
+import {View,Text,ScrollView} from 'react-native';
 
 import GlobalBackground from '@/components/layout/GlobalBackground';
-import Icon from '@expo/vector-icons/Ionicons'; 
+
+import SelectOptionButton from '@/components/ui/buttons/SelectOptionButton'; 
+import PrimaryButton from '@/components/ui/buttons/PrimaryButton';
+
+import { useAppContext } from '@/context/AppContext';
+import { router } from 'expo-router';
 
 export default function SeleccionarPersonaScreen() {
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
+  const { setData  } = useAppContext(); //Set de datos para contexto
 
+  //Datos de prueba
   const personas = [
     {
-      id: 1,
+      id: "ALU1",
       nombre: 'David Ignacio Rubilar Yaber',
-      foto: 'https://via.placeholder.com/80 ', // Reemplaza con URL real
     },
     {
-      id: 2,
+      id: "ALU2",
       nombre: 'Camilo Andrés Rubilar Yaber',
-      foto: 'https://via.placeholder.com/80 ', // Reemplaza con URL real
     },
   ];
+
+  //Funcion a ejecutar cuando se apreta el boton
+  const handleContinue = () => {
+    if (selectedPerson) {
+      const selected = personas.find(p => p.id === selectedPerson);
+
+      if (selected) {
+        // Se guardan datos en el contexto (sobrescribe)
+        setData({
+          alumnoSeleccionado: {
+            id: selected.id,
+            nombre: selected.nombre,
+          },
+        });
+
+        router.push('/encargadoRetiro');
+      }
+    }
+  };
 
   return (
     <GlobalBackground>
     <View className="flex-1 justify-center items-center px-5 max-w-[400px] mx-auto w-full">
-        {/* Encabezado */}
-        <Text className="text-xl font-bold text-blue-600 mb-4">
-            NOMBRE
-        </Text>
-
         {/* Pregunta */}
-        <Text className="text-lg text-center text-gray-700 mb-6">
+        <Text className="text-xl font-bold text-blue-600 mb-4">
           ¿A quién desea retirar?
         </Text>
 
-        <View className="w-full space-y-4 mb-8">
+    {/* Opciones de selección */}
+    <View className="w-full mb-8 max-h-80"> 
+      <ScrollView contentContainerClassName="space-y-4">
         {personas.map((persona) => (
-            <TouchableOpacity
+          <SelectOptionButton
             key={persona.id}
-            onPress={() => setSelectedPerson(persona.nombre)}
-            className={`flex-row items-center p-6 rounded-xl border border-grey-800 ${
-                selectedPerson === persona.nombre ? 'border-blue-500' : ''
-            }`}
-            >
-            <Image
-                source={{ uri: persona.foto }}
-                className="w-6 h-8 rounded-full align-self-center mx-auto"
-            />
-            <Text className="ml-6 text-base text-black flex-1">
-                {persona.nombre}
-            </Text>
-            </TouchableOpacity>
+            label={persona.nombre}
+            isSelected={selectedPerson === persona.id}
+            onPress={() => setSelectedPerson(persona.id)}
+          />
         ))}
-        </View>
+      </ScrollView>
+    </View>
 
-        {/* Botón continuar */}
-        <TouchableOpacity
-          disabled={!selectedPerson}
-          className={`py-3 px-8 rounded-lg self-center flex-row items-center space-x-2 ${
-            selectedPerson ? 'bg-blue-600' : 'bg-gray-300'
-          }`}
-        >
-          <Text className="text-white font-medium">Continuar</Text>
-          <Icon name="arrow-forward" size={20} color="white" />
-        </TouchableOpacity>
+      {/* Botón continuar */}
+      <View className="w-full px-4">
+        <View className="max-w-[320px] w-full mx-auto">
+          <PrimaryButton
+            title="Continuar"
+            disabled={!selectedPerson}
+              onPress={handleContinue} 
+            />
+        </View>
+      </View>
+
+
       </View>
     </GlobalBackground>
   );

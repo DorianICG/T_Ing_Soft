@@ -21,6 +21,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onForgotPassword, isLoad
       </View>
       <Text className="text-3xl font-bold text-center text-gray-900">Login</Text>
       <Text className="text-gray-400 text-center mt-1 mb-6">Inicia sesión para continuar</Text>
+      
       <Text className="text-xs font-semibold text-gray-500 mb-1 ml-1">EMAIL</Text>
       <View className="flex-row items-center bg-gray-100 rounded-xl border border-gray-300 px-3 mb-4">
         <TextInput
