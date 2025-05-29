@@ -1,44 +1,77 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter, useSegments } from 'expo-router';
+import { Platform } from 'react-native'; // Importar Platform
 import {
   loginUser,
   completeForcePasswordApi,
   verifyMfaApi,
   ApiUser,
-  //LoginApiResponse,
   ForcePasswordChangeDetails,
   MfaRequiredDetails,
   LoginSuccessDetails,
-  //ForceChangePasswordApiResponse,
-  //VerifyMfaApiResponse
 } from '../services/api';
 
 const PERMANENT_TOKEN_KEY = 'user-permanent-token';
 
+// --- Funciones auxiliares para almacenamiento multiplataforma ---
+const storeToken = async (key: string, value: string) => {
+  if (Platform.OS === 'web') {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.error('Failed to save token to localStorage', e);
+    }
+  } else {
+    await SecureStore.setItemAsync(key, value);
+  }
+};
+
+const getToken = async (key: string): Promise<string | null> => {
+  if (Platform.OS === 'web') {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.error('Failed to get token from localStorage', e);
+      return null;
+    }
+  } else {
+    return await SecureStore.getItemAsync(key);
+  }
+};
+
+const deleteToken = async (key: string) => {
+  if (Platform.OS === 'web') {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.error('Failed to delete token from localStorage', e);
+    }
+  } else {
+    await SecureStore.deleteItemAsync(key);
+  }
+};
+// --- Fin de funciones auxiliares ---
+
 type User = ApiUser;
 
 interface AuthContextType {
-  login: (rut: string, password: string, captchaToken?: string) => Promise<void>; // Función para iniciar sesión
-  logout: () => void; // Función para cerrar sesión
-  completeForcePasswordChange: (newPassword: string, confirmPassword: string) => Promise<void>; // Función para completar el cambio de contraseña
-  verifyMfa: (code: string) => Promise<void>; // Función para verificar MFA
-  user: User | null; // Usuario autenticado
-  token: string | null; // Token de sesión permanente
-  isAuthenticated: boolean; // Indica si el usuario está autenticado
-  isLoading: boolean; // Para carga inicial y operaciones async
-
-  needsPasswordChange: boolean; // Indica si el usuario necesita cambiar la contraseña
-  userEmailForPasswordChange: string | null; // Email del usuario que necesita cambiar contraseña
-  tempToken: string | null; // Token temporal para forceChangePassword
-  awaitsMfaVerification: boolean; // Indica si se está esperando la verificación de MFA
-  mfaEmail: string | null; // Email para el cual se está verificando MFA
+  login: (rut: string, password: string, captchaToken?: string) => Promise<void>;
+  logout: () => void;
+  completeForcePasswordChange: (newPassword: string, confirmPassword: string) => Promise<void>;
+  verifyMfa: (code: string) => Promise<void>;
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  needsPasswordChange: boolean;
+  userEmailForPasswordChange: string | null;
+  tempToken: string | null;
+  awaitsMfaVerification: boolean;
+  mfaEmail: string | null;
 }
 
-// Contexto de autenticación
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Hook para usar el contexto de autenticación
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -47,52 +80,49 @@ export const useAuth = () => {
   }
   return context;
 };
-// Proveedor de autenticación
-// Este componente envuelve la aplicación y proporciona el contexto de autenticación
+
 interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Proveedor de autenticación
-// Este componente envuelve la aplicación y proporciona el contexto de autenticación
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null); 
-  const [token, setToken] = useState<string | null>(null); 
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const segments = useSegments();
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [userEmailForPasswordChange, setUserEmailForPasswordChange] = useState<string | null>(null);
   const [tempTokenState, setTempTokenState] = useState<string | null>(null);
-
   const [awaitsMfaVerification, setAwaitsMfaVerification] = useState(false);
   const [mfaEmail, setMfaEmail] = useState<string | null>(null);
 
-  // Cargar el token y el usuario al iniciar la aplicación
-  // Este efecto se ejecuta una vez al cargar la aplicación
-  // y verifica si hay un token almacenado en SecureStore
-  // Si hay un token, lo establece en el estado y carga el usuario
   useEffect(() => {
     const loadTokenAndUser = async () => {
+      console.log('[AUTH_LOAD] Cargando token y usuario ')
       setIsLoading(true);
       try {
-        const storedPermanentToken = await SecureStore.getItemAsync(PERMANENT_TOKEN_KEY);
+        const storedPermanentToken = await getToken(PERMANENT_TOKEN_KEY); // Usar getToken
+        console.log('[AUTH_LOAD] Token from storage:', storedPermanentToken ? 'found' : 'not found');
         if (storedPermanentToken) {
           setToken(storedPermanentToken);
+        } else {
+          setToken(null);
+          setUser(null);
         }
       } catch (e) {
-        console.error('Failed to load token or user', e);
-        await SecureStore.deleteItemAsync(PERMANENT_TOKEN_KEY);
-        setToken(null); setUser(null);
+        console.error('[AUTH_LOAD] Failed to load token or user', e);
+        await deleteToken(PERMANENT_TOKEN_KEY); // Usar deleteToken
+        setToken(null); 
+        setUser(null);
       } finally {
+        console.log('[AUTH_LOAD] Finished loading. isLoading: false');
         setIsLoading(false);
       }
     };
     loadTokenAndUser();
   }, []);
 
-  // Redirigir al usuario según su rol
-  // Esta función se encarga de redirigir al usuario a la ruta correspondiente según su rol
   const redirectToRole = useCallback((role: User['role']) => {
     if (role === 'ADMIN') router.replace('/(admin)/(tabs)/home');
     else if (role === 'INSPECTOR') router.replace('/(inspector)/(tabs)/home');
@@ -103,10 +133,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments.length > 0 && segments[0] === '(auth)'; // Verifica si está en el grupo de rutas de autenticación
-    const currentPath = segments.join('/'); // Obtiene la ruta actual como una cadena
-    const inForcePasswordChangeScreen = currentPath === '(auth)/force-change-password'; // Verifica si está en la pantalla de cambio de contraseña forzado
-    const inMfaScreen = currentPath === '(auth)/mfa-verification'; // Verifica si está en la pantalla de verificación de MFA
+    const inAuthGroup = segments.length > 0 && segments[0] === '(auth)';
+    const currentPath = segments.join('/');
+    const inForcePasswordChangeScreen = currentPath === '(auth)/force-change-password';
+    const inMfaScreen = currentPath === '(auth)/mfa-verification';
 
     if (needsPasswordChange && !inForcePasswordChangeScreen) {
       router.replace('/(auth)/force-change-password');
@@ -137,16 +167,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const handleFullLoginSuccess = useCallback(async (permanentToken: string, userData: User) => {
     setToken(permanentToken);
     setUser(userData);
-    await SecureStore.setItemAsync(PERMANENT_TOKEN_KEY, permanentToken);
+    await storeToken(PERMANENT_TOKEN_KEY, permanentToken); // Usar storeToken
     clearIntermediateStates();
     redirectToRole(userData.role);
   }, [redirectToRole]);
 
   const login = useCallback(async (rutLogin: string, passwordLogin: string, captchaToken?: string) => {
     setIsLoading(true);
-    clearIntermediateStates(); 
-    setToken(null); setUser(null); 
-    await SecureStore.deleteItemAsync(PERMANENT_TOKEN_KEY);
+    clearIntermediateStates();
+    setToken(null); setUser(null);
+    await deleteToken(PERMANENT_TOKEN_KEY); // Usar deleteToken
 
     try {
       const response = await loginUser({ rut: rutLogin, password: passwordLogin, captchaToken });
@@ -154,7 +184,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if ('forceChangePassword' in response && response.forceChangePassword === true) {
         const details = response as ForcePasswordChangeDetails;
         setTempTokenState(details.tempToken);
-        setUserEmailForPasswordChange(details.email); 
+        setUserEmailForPasswordChange(details.email);
         setNeedsPasswordChange(true);
       } else if ('mfaRequired' in response && response.mfaRequired === true) {
         const details = response as MfaRequiredDetails;
@@ -171,7 +201,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Login failed in AuthContext:', error);
       clearIntermediateStates();
       setToken(null); setUser(null);
-      await SecureStore.deleteItemAsync(PERMANENT_TOKEN_KEY);
+      await deleteToken(PERMANENT_TOKEN_KEY); // Usar deleteToken
       throw error;
     } finally {
       setIsLoading(false);
@@ -191,14 +221,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if ('mfaRequired' in response && response.mfaRequired === true) {
         const details = response as MfaRequiredDetails;
-        setMfaEmail(details.email); // El email para MFA viene de esta respuesta
+        setMfaEmail(details.email);
         setAwaitsMfaVerification(true);
-        setNeedsPasswordChange(false); // Ya no necesita cambiar contraseña
-        setTempTokenState(null);       // Token temporal usado
-        setUserEmailForPasswordChange(null); // Email para cambio de pass ya no es necesario
-        // Redirección a MFA manejada por useEffect
+        setNeedsPasswordChange(false);
+        setTempTokenState(null);
+        setUserEmailForPasswordChange(null);
       } else if ('token' in response && response.token && response.user) {
-        // Este caso es menos común según tu flujo, pero lo manejamos por si el backend lo permite
         const details = response as LoginSuccessDetails;
         await handleFullLoginSuccess(details.token, details.user);
       } else {
@@ -207,7 +235,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Failed to complete password change:', error);
-      // No limpiar tempTokenState aquí, para que el usuario pueda reintentar si es un error de red
       throw error;
     } finally {
       setIsLoading(false);
@@ -221,11 +248,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     try {
       const response = await verifyMfaApi({ email: mfaEmail, code });
-      // La respuesta siempre debería ser LoginSuccessDetails si es exitosa
       await handleFullLoginSuccess(response.token, response.user);
     } catch (error) {
       console.error('Failed to verify MFA:', error);
-      // No limpiar mfaEmail aquí, para que el usuario pueda reintentar
       throw error;
     } finally {
       setIsLoading(false);
@@ -236,10 +261,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     clearIntermediateStates();
     setToken(null); setUser(null);
-    await SecureStore.deleteItemAsync(PERMANENT_TOKEN_KEY);
-    // La redirección a login la manejará el useEffect principal
-    // router.replace('/(auth)/login'); // Opcionalmente, forzar aquí
+    await deleteToken(PERMANENT_TOKEN_KEY); // Usar deleteToken
     setIsLoading(false);
+    // La redirección a login la manejará el useEffect principal
   }, []);
 
   const isAuthenticated = !!token && !!user && !needsPasswordChange && !awaitsMfaVerification;
@@ -255,10 +279,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isAuthenticated,
       isLoading,
       needsPasswordChange,
-      userEmailForPasswordChange, // Este es el email del usuario que necesita cambiar contraseña
+      userEmailForPasswordChange,
       tempToken: tempTokenState,
       awaitsMfaVerification,
-      mfaEmail // Este es el email para el cual se está verificando MFA
+      mfaEmail
     }}>
       {children}
     </AuthContext.Provider>
