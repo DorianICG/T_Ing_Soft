@@ -9,6 +9,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider, useAuth } from '../context/AuthContext'; 
 import { useEffect } from 'react';
 import { ActivityIndicator, Text, View, Image } from 'react-native'; 
+import { AppProvider } from '@/context/AppContext';
 
 import images from '@/constants/images';
 
@@ -67,7 +68,9 @@ function InitialLayout() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <InitialLayout />
+      <AppProvider>
+        <InitialLayout />
+      </AppProvider>
     </AuthProvider>
   );
 }
