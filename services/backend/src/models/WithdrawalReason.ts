@@ -6,17 +6,16 @@ import Withdrawal from './Withdrawal';
 export interface WithdrawalReasonAttributes {
   id: CreationOptional<number>;
   name: string;
-  requiresContactVerification: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface WithdrawalReasonCreationAttributes extends Optional<WithdrawalReasonAttributes, 'id' | 'requiresContactVerification' | 'createdAt' | 'updatedAt'> {}
+export interface WithdrawalReasonCreationAttributes extends Optional<WithdrawalReasonAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
 
 class WithdrawalReason extends Model<WithdrawalReasonAttributes, WithdrawalReasonCreationAttributes> implements WithdrawalReasonAttributes {
   public id!: CreationOptional<number>;
   public name!: string;
-  public requiresContactVerification!: boolean;
+  public !: boolean;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -48,7 +47,6 @@ export const initWithdrawalReasonModel = () => {
     {
       id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
       name: { type: DataTypes.STRING(100), allowNull: false, unique: true },
-      requiresContactVerification: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'requires_contact_verification' },
     },
     {
       sequelize: sequelizeInstance,

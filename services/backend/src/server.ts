@@ -4,6 +4,7 @@ import config from './config/env';
 import sequelize from './config/database';
 import authRoutes from './auth/routes/auth.routes';
 import adminRoutes from './admin/routes/admin.routes';
+import withdrawalRoutes from './withdrawals/routes';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 // Montar Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/withdrawals', withdrawalRoutes);
 
 // Ruta simple para verificar que el servidor está vivo
 app.get('/', (req, res) => {

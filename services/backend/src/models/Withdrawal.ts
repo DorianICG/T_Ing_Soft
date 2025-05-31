@@ -14,6 +14,7 @@ export interface WithdrawalAttributes {
   studentId: ForeignKey<Student['id']>;
   organizationApproverUserId: ForeignKey<User['id']>;
   reasonId: ForeignKey<WithdrawalReason['id']>;
+  status: string; // 'PENDING', 'APPROVED', 'DENIED'
   method: string; // 'QR', 'MANUAL', etc.
   contactVerified: boolean;
   retrieverUserId: ForeignKey<User['id']> | null;
@@ -36,6 +37,7 @@ export interface WithdrawalCreationAttributes extends Optional<WithdrawalAttribu
   'id' |
   'qrAuthorizationId' |
   'contactVerified' |
+  'status' |
   'retrieverUserId' |
   'retrieverDelegateId' |
   'retrieverEmergencyContactId' |
@@ -59,6 +61,7 @@ class Withdrawal extends Model<WithdrawalAttributes, WithdrawalCreationAttribute
   public organizationApproverUserId!: ForeignKey<User['id']>;
   public reasonId!: ForeignKey<WithdrawalReason['id']>;
   public method!: string;
+  public status!: string; // 'PENDING', 'APPROVED', 'DENIED'
   public contactVerified!: boolean;
   public retrieverUserId!: ForeignKey<User['id']> | null;
   public retrieverDelegateId!: ForeignKey<Delegate['id']> | null;
@@ -190,6 +193,7 @@ export const initWithdrawalModel = () => {
         references: { model: 'withdrawal_reasons', key: 'id' }
       },
       method: { type: DataTypes.STRING(10), allowNull: false },
+      status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'PENDING' }, // 'PENDING', 'APPROVED', 'DENIED'
       contactVerified: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'contact_verified' },
       retrieverUserId: { // Atributo en modelo
         type: DataTypes.INTEGER, allowNull: true, field: 'retriever_user_id', // Columna en BD
