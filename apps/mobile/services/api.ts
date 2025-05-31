@@ -15,7 +15,7 @@ if (!determinedApiUrl) { // Si localApiUrlAttempt es undefined (debuggerHost no 
 }
 
 // manifest.extra.apiBaseUrl tendrá la máxima prioridad si está definido en app.json
-const API_BASE_URL = manifest?.extra?.apiBaseUrl || determinedApiUrl || 'http://localhost:3000/api';
+export const API_BASE_URL = manifest?.extra?.apiBaseUrl || determinedApiUrl || 'http://localhost:3000/api';
 
 console.log('API Base URL:', API_BASE_URL); 
 

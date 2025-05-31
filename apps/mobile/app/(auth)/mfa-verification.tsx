@@ -9,7 +9,7 @@ import CodeInput from '@/components/ui/input/CodeInput';
 
 export default function MfaVerificationScreen() { 
   const [smsCode, setSmsCode] = useState('');
-  const smsCodeMaxDigits = 6; // SE ASUME EL MAXIMO DE DIGITOS A COLOCAR, CAMBIAR AQUI SI SON MAS O MENOS!!!!
+  const smsCodeMaxDigits = 6; // Si se cambia, ajustar aqui
 
   // Logica al apretar botón
   const handleNextPress = () => {
