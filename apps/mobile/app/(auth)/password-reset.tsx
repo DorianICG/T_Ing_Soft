@@ -9,6 +9,12 @@ import PrimaryButton from '@/components/ui/buttons/PrimaryButton';
 export default function PasswordResetScreen() { 
   const [email, setEmail] = useState('');
 
+  // Logica al apretar botón
+  const handleNextPress = () => {
+    console.log('Email ingresado:', email);
+    // Aqui debajo se añade logica para enviar al back
+  };
+
   return (
     <AuthBackground>
       <View className="flex-1 justify-start items-center px-5 max-w-[400px] mx-auto w-full">
@@ -44,16 +50,14 @@ export default function PasswordResetScreen() {
         </View>
 
 
-        {/* Botón de acción */}
-
+      {/* Botón de acción */}
+      <View className="w-1/2">
         <PrimaryButton
           title="Siguiente"
-          onPress={() => {
-            console.log('Correo electrónico ingresado:', email);
-          }}
+          onPress={handleNextPress}
           disabled={!email.trim()}
         />
-
+      </View>
 
       </View>
     </AuthBackground>

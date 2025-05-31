@@ -16,6 +16,7 @@ export default function LoginScreen() {
   const [rut, setRut] = useState('');
   const [password, setPassword] = useState('');
 
+  // Logica al apretar botón
   const handleLogin = async () => {
     try {
       await login(rut, password);
@@ -30,6 +31,7 @@ export default function LoginScreen() {
 
   return (
     <AuthBackground>
+      {/* Contenedor */}
   <SafeAreaView className="flex-1 bg-gray-50">
     <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
     <View className="flex-1 items-center justify-start">
@@ -37,7 +39,7 @@ export default function LoginScreen() {
       <Text className="text-3xl font-bold text-center text-gray-900">Bienvenido</Text>
       <Text className="text-gray-400 text-center mt-1 mb-6">Inicia sesión para continuar</Text>
 
-
+      {/* Seccion inputs */}
       <View className="space-y-4">
 
         <Text className="text-xs font-semibold text-gray-500 mb-1 ml-1">RUT</Text>
@@ -62,17 +64,18 @@ export default function LoginScreen() {
         <PrimaryButton
           title="Ingresar"
           onPress={handleLogin}
+          disabled={!rut.trim() || !password.trim()}
         />
       </View>
     </View>
 
       {/* Contraseña */}
-<View className="items-center mt-4">
-  <TextLinkButton
-    title="¿Olvidaste tu contraseña?"
-    onPress={() => router.push('/password-reset')}
-  />
-</View>
+      <View className="items-center mt-4">
+        <TextLinkButton
+          title="¿Olvidaste tu contraseña?"
+          onPress={() => router.push('/password-reset')}
+        />
+      </View>
 
 
       <Text className="text-xs text-gray-500 text-center mt-2">
