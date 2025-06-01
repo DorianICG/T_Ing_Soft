@@ -84,7 +84,6 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction): 
 
     if (currentActiveOrgId === undefined && adminOrganizationsList.length === 1) {
       currentActiveOrgId = adminOrganizationsList[0].id;
-      console.log(`INFO: activeOrganizationId no estaba definido. Establecido automáticamente a la única organización de administración: ${currentActiveOrgId}`);
     }
     
     if (currentActiveOrgId !== undefined) {
@@ -117,60 +116,3 @@ export const isAdmin = async (req: Request, res: Response, next: NextFunction): 
     return;
   }
 };
-
-export default function validate(schemaSource: { body?: Joi.Schema, query?: Joi.Schema, params?: Joi.Schema }) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const options = {
-      abortEarly: false,
-      allowUnknown: true,
-      stripUnknown: true,
-    };
-
-    let errors: Joi.ValidationErrorItem[] = [];
-    const validatedDataCollector: { body?: any, query?: any, params?: any } = {};
-
-    // Validar req.body
-    if (schemaSource.body) {
-      const { error, value } = schemaSource.body.validate(req.body, { ...options, stripUnknown: true });
-      if (error) {
-        errors = errors.concat(error.details);
-      } else {
-        validatedDataCollector.body = value; 
-      }
-    }
-
-    // Validar req.query 
-    if (schemaSource.query) {
-      const { error, value } = schemaSource.query.validate(req.query, { ...options, stripUnknown: false });
-      if (error) {
-        errors = errors.concat(error.details);
-      } else {
-        validatedDataCollector.query = value; 
-      }
-    }
-
-    // Validar req.params
-    if (schemaSource.params) {
-      const { error, value } = schemaSource.params.validate(req.params, options); 
-      if (error) {
-        errors = errors.concat(error.details);
-      } else {
-        validatedDataCollector.params = value;
-      }
-    }
-
-    if (errors.length > 0) {
-      const formattedErrors = errors.map((err: Joi.ValidationErrorItem) => ({
-        message: err.message.replace(/['"]/g, ''),
-        field: err.path.join('.'),
-        location: schemaSource.body && validatedDataCollector.body && err.path.length > 0 && Object.prototype.hasOwnProperty.call(req.body, err.path[0]) ? 'body' :
-                    schemaSource.query && validatedDataCollector.query && err.path.length > 0 && Object.prototype.hasOwnProperty.call(req.query, err.path[0]) ? 'query' :
-                    schemaSource.params && validatedDataCollector.params && err.path.length > 0 && Object.prototype.hasOwnProperty.call(req.params, err.path[0]) ? 'params' : err.path[0] || 'unknown',
-      }));
-      return res.status(400).json({ errors: formattedErrors });
-    }
-
-    (req as any).validatedData = validatedDataCollector;
-    next();
-  };
-}

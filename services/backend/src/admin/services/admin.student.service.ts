@@ -10,9 +10,6 @@ import { AuthenticatedAdminUser } from '../middlewares/admin.auth.middleware';
 import sequelize from '../../config/database';
 import { Op } from 'sequelize';
 
-
-
-
 export interface CreateStudentData {
   rut: string;
   firstName: string;
@@ -292,7 +289,385 @@ class AdminStudentService {
     }
   }
 
-}
+  // OBTENER ESTUDIANTES CON FILTROS Y PAGINACIÓN
+  async getStudents(filters: {
+    page: number;
+    limit: number;
+    search: string;
+    courseId?: number;
+    organizationId?: number;
+    hasParent?: boolean;
+    adminOrganizations: Array<{ id: number; name: string }>;
+  }): Promise<{
+    students: Array<any>;
+    total: number;
+    totalPages: number;
+    currentPage: number;
+  }> {
+    try {
+      const { page, limit, search, courseId, organizationId, hasParent, adminOrganizations } = filters;
+      
+      // Construir filtros de organización
+      const allowedOrgIds = adminOrganizations.map(org => org.id);
+      const whereClause: any = {
+        organizationId: { [Op.in]: allowedOrgIds }
+      };
+    
+      // Filtro por organización específica
+      if (organizationId) {
+        whereClause.organizationId = organizationId;
+      }
+    
+      // Filtro por curso
+      if (courseId) {
+        whereClause.courseId = courseId;
+      }
+    
+      // Filtro por si tiene apoderado
+      if (hasParent !== undefined) {
+        whereClause.parentId = hasParent ? { [Op.not]: null } : null;
+      }
+    
+      // Filtro de búsqueda por nombre o RUT
+      if (search && search.trim()) {
+        const searchTerm = search.trim();
+        whereClause[Op.or] = [
+          { firstName: { [Op.iLike]: `%${searchTerm}%` } },
+          { lastName: { [Op.iLike]: `%${searchTerm}%` } },
+          { rut: { [Op.iLike]: `%${searchTerm}%` } }
+        ];
+      }
+    
+      const offset = (page - 1) * limit;
+    
+      const { count, rows: students } = await Student.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['id', 'name'] 
+          },
+          {
+            model: User,
+            as: 'parent',
+            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone'],
+            required: false
+          },
+          {
+            model: Organization,
+            as: 'organization',
+            attributes: ['id', 'name']
+          }
+        ],
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']],
+        limit,
+        offset
+      });
+    
+      const formattedStudents = students.map(student => ({
+        id: student.id,
+        rut: student.rut,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        fullName: `${student.firstName} ${student.lastName}`,
+        birthDate: student.birthDate,
+        course: student.course ? {
+          id: student.course.id,
+          name: student.course.name
+        } : null,
+        parent: student.parent ? {
+          id: student.parent.id,
+          rut: student.parent.rut,
+          firstName: student.parent.firstName,
+          lastName: student.parent.lastName,
+          fullName: `${student.parent.firstName} ${student.parent.lastName}`,
+          phone: student.parent.phone
+        } : null,
+        organization: student.organization ? {
+          id: student.organization.id,
+          name: student.organization.name
+        } : null,
+        createdAt: student.createdAt,
+        updatedAt: student.updatedAt
+      }));
+    
+      return {
+        students: formattedStudents,
+        total: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
+      };
+    
+    } catch (error: any) {
+      console.error('Error obteniendo estudiantes:', error);
+      throw new Error('Error al obtener la lista de estudiantes.');
+    }
+  }
+  
+  // OBTENER ESTUDIANTE POR ID
+  async getStudent(studentId: number, adminOrganizations: Array<{ id: number; name: string }>): Promise<any | null> {
+    try {
+      const allowedOrgIds = adminOrganizations.map(org => org.id);
+    
+      const student = await Student.findOne({
+        where: {
+          id: studentId,
+          organizationId: { [Op.in]: allowedOrgIds }
+        },
+        include: [
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['id', 'name']
+          },
+          {
+            model: User,
+            as: 'parent',
+            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone', 'email'],
+            required: false
+          },
+          {
+            model: Organization,
+            as: 'organization',
+            attributes: ['id', 'name']
+          }
+        ]
+      });
+    
+      if (!student) {
+        return null;
+      }
+    
+      return {
+        id: student.id,
+        rut: student.rut,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        fullName: `${student.firstName} ${student.lastName}`,
+        birthDate: student.birthDate,
+        course: student.course ? {
+          id: student.course.id,
+          name: student.course.name
+        } : null,
+        parent: student.parent ? {
+          id: student.parent.id,
+          rut: student.parent.rut,
+          firstName: student.parent.firstName,
+          lastName: student.parent.lastName,
+          fullName: `${student.parent.firstName} ${student.parent.lastName}`,
+          phone: student.parent.phone,
+          email: student.parent.email
+        } : null,
+        organization: student.organization ? {
+          id: student.organization.id,
+          name: student.organization.name
+        } : null,
+        createdAt: student.createdAt,
+        updatedAt: student.updatedAt
+      };
+    
+    } catch (error: any) {
+      console.error('Error obteniendo estudiante:', error);
+      throw new Error('Error al obtener el estudiante.');
+    }
+  }
+  
+  // ACTUALIZAR ESTUDIANTE
+  async updateStudent(
+    studentId: number, 
+    updateData: {
+      firstName?: string;
+      lastName?: string;
+      birthDate?: string | null;
+      courseId?: number;
+      parentRut?: string | null;
+    },
+    adminUser: AuthenticatedAdminUser
+  ): Promise<any> {
+    const t = await sequelize.transaction();
+  
+    try {
+      // Verificar que el estudiante existe y el admin tiene permisos
+      const allowedOrgIds = adminUser.adminOrganizations?.map(org => org.id) || [];
+      
+      const existingStudent = await Student.findOne({
+        where: {
+          id: studentId,
+          organizationId: { [Op.in]: allowedOrgIds }
+        },
+        transaction: t
+      });
+    
+      if (!existingStudent) {
+        throw new Error('Estudiante no encontrado o no tiene permisos para editarlo.');
+      }
+    
+      const updatePayload: any = {};
+    
+      // Actualizar nombres
+      if (updateData.firstName !== undefined) {
+        if (!updateData.firstName || updateData.firstName.trim() === '') {
+          throw new Error('El nombre del estudiante no puede estar vacío.');
+        }
+        updatePayload.firstName = updateData.firstName.trim();
+      }
+    
+      if (updateData.lastName !== undefined) {
+        if (!updateData.lastName || updateData.lastName.trim() === '') {
+          throw new Error('El apellido del estudiante no puede estar vacío.');
+        }
+        updatePayload.lastName = updateData.lastName.trim();
+      }
+    
+      // Actualizar fecha de nacimiento
+      if (updateData.birthDate !== undefined) {
+        if (updateData.birthDate && updateData.birthDate.trim() !== '') {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(updateData.birthDate)) {
+            throw new Error('El formato de la fecha de nacimiento debe ser YYYY-MM-DD.');
+          }
+          const dateObj = new Date(updateData.birthDate + "T00:00:00Z");
+          if (isNaN(dateObj.getTime())) {
+            throw new Error('La fecha de nacimiento proporcionada no es válida.');
+          }
+          updatePayload.birthDate = dateObj;
+        } else {
+          updatePayload.birthDate = null;
+        }
+      }
+    
+      // Actualizar curso
+      if (updateData.courseId !== undefined) {
+        const course = await Course.findOne({
+          where: {
+            id: updateData.courseId,
+            organizationId: existingStudent.organizationId
+          },
+          transaction: t
+        });
+      
+        if (!course) {
+          throw new Error(`El curso con ID ${updateData.courseId} no existe o no pertenece a la organización del estudiante.`);
+        }
+        updatePayload.courseId = updateData.courseId;
+      }
+    
+      // Actualizar apoderado
+      if (updateData.parentRut !== undefined) {
+        if (updateData.parentRut && updateData.parentRut.trim() !== '') {
+          if (!validarRut(updateData.parentRut)) {
+            throw new Error('El RUT del apoderado no es válido.');
+          }
+          
+          const formattedParentRut = formatearRut(updateData.parentRut);
+          const parentUser = await User.findOne({
+            where: { rut: formattedParentRut },
+            include: [{
+              model: UserOrganizationRole,
+              as: 'organizationRoleEntries',
+              where: { organizationId: existingStudent.organizationId },
+              required: true
+            }],
+            transaction: t
+          });
+        
+          if (!parentUser) {
+            throw new Error(`El apoderado con RUT ${formattedParentRut} no está registrado en la organización.`);
+          }
+          updatePayload.parentId = parentUser.id;
+        } else {
+          updatePayload.parentId = null;
+        }
+      }
+    
+      // Realizar la actualización
+      await existingStudent.update(updatePayload, { transaction: t });
+    
+      // Obtener el estudiante actualizado con todas las relaciones
+      const updatedStudent = await Student.findByPk(studentId, {
+        include: [
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['id', 'name']
+          },
+          {
+            model: User,
+            as: 'parent',
+            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone'],
+            required: false
+          },
+          {
+            model: Organization,
+            as: 'organization',
+            attributes: ['id', 'name']
+          }
+        ],
+        transaction: t
+      });
+    
+      await t.commit();
+    
+      return {
+        id: updatedStudent!.id,
+        rut: updatedStudent!.rut,
+        firstName: updatedStudent!.firstName,
+        lastName: updatedStudent!.lastName,
+        fullName: `${updatedStudent!.firstName} ${updatedStudent!.lastName}`,
+        birthDate: updatedStudent!.birthDate,
+        course: updatedStudent!.course ? {
+          id: updatedStudent!.course.id,
+          name: updatedStudent!.course.name
+        } : null,
+        parent: updatedStudent!.parent ? {
+          id: updatedStudent!.parent.id,
+          rut: updatedStudent!.parent.rut,
+          fullName: `${updatedStudent!.parent.firstName} ${updatedStudent!.parent.lastName}`,
+          phone: updatedStudent!.parent.phone
+        } : null,
+        organization: updatedStudent!.organization ? {
+          id: updatedStudent!.organization.id,
+          name: updatedStudent!.organization.name
+        } : null,
+        updatedAt: updatedStudent!.updatedAt
+      };
+    
+    } catch (error: any) {
+      await t.rollback();
+      console.error('Error actualizando estudiante:', error);
+      throw new Error(error.message || 'Error al actualizar el estudiante.');
+    }
+  }
+  
+  // ELIMINAR ESTUDIANTE
+  async deleteStudent(studentId: number, adminUser: AuthenticatedAdminUser): Promise<void> {
+    const t = await sequelize.transaction();
+  
+    try {
+      const allowedOrgIds = adminUser.adminOrganizations?.map(org => org.id) || [];
+      
+      const existingStudent = await Student.findOne({
+        where: {
+          id: studentId,
+          organizationId: { [Op.in]: allowedOrgIds }
+        },
+        transaction: t
+      });
+    
+      if (!existingStudent) {
+        throw new Error('Estudiante no encontrado o no tiene permisos para eliminarlo.');
+      }
+    
+      await existingStudent.destroy({ transaction: t });
+      await t.commit();
+    
+    } catch (error: any) {
+      await t.rollback();
+      console.error('Error eliminando estudiante:', error);
+      throw new Error(error.message || 'Error al eliminar el estudiante.');
+    }
+  }
 
+}
 
 export default new AdminStudentService();

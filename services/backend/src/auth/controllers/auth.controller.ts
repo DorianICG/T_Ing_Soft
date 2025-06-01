@@ -25,23 +25,18 @@ const getHighestPriorityRole = (
   let highestRoleName: string | null = null;
   let highestPriorityIndex = roleHierarchy.length; 
 
-  console.log('DEBUG getHighestPriorityRole: userOrgRoles:', userOrgRoles);
 
   for (const entry of userOrgRoles) {
     if (entry.role && entry.role.name) {
       const roleNameUpper = entry.role.name.toUpperCase();
       const priorityIndex = roleHierarchy.indexOf(roleNameUpper);
-      console.log(`DEBUG getHighestPriorityRole: roleNameUpper: ${roleNameUpper}, priorityIndex: ${priorityIndex}`);
       if (priorityIndex !== -1 && priorityIndex < highestPriorityIndex) {
         highestPriorityIndex = priorityIndex;
         highestRoleName = entry.role.name; 
-        console.log(`DEBUG getHighestPriorityRole: Nueva prioridad más alta encontrada: ${highestRoleName}`);
       }
     }else { 
-      console.log('DEBUG getHighestPriorityRole: entry.role o entry.role.name es nulo o indefinido.');
     }
   }
-  console.log(`DEBUG getHighestPriorityRole: Rol más alto encontrado: ${highestRoleName}`);
   return highestRoleName;
 };
 
@@ -64,7 +59,6 @@ function recordFailedIpAttempt(ip: string): void {
     attemptInfo = { count: 1, firstAttemptTime: now };
   }
   ipLoginAttempts.set(ip, attemptInfo);
-  console.log(`IP ${ip} failed attempt. Current count in window: ${attemptInfo.count}`);
 }
 
 function getIpFailedAttempts(ip: string): number {
@@ -79,7 +73,6 @@ function getIpFailedAttempts(ip: string): number {
 
 function resetIpFailedAttempts(ip: string): void {
   ipLoginAttempts.delete(ip);
-  console.log(`IP ${ip} successful login or action. Attempts reset.`);
 }
 
 // Controlador de autenticación
@@ -117,7 +110,6 @@ class AuthController {
         console.warn('Client IP is undefined. Skipping IP-based CAPTCHA checks.');
       }
 
-      console.log('1. Buscando usuario...');
       const user = await User.findOne({
         where: { rut },
         include: [{
@@ -131,31 +123,26 @@ class AuthController {
           }]
         }]
       });
-      console.log('2. Usuario encontrado:', user ? user.rut : 'No encontrado');
 
       let userBasedCaptchaRequired = false; 
       if (user && user.failedLoginAttempts >= 2 && !user.accountLocked) {
           if (!ipNeedsCaptchaCheck) { 
             userBasedCaptchaRequired = true;
-            console.log(`Intento ${user.failedLoginAttempts + 1} para RUT ${rut}. Requiere verificación CAPTCHA v3 (user-based).`);
           }
       }
 
       if (userBasedCaptchaRequired) {
         if (!captchaToken) {
-          console.log(`User ${rut} (user-based) requires CAPTCHA, but no token provided.`);
           res.status(401).json({ error: 'Verificación de seguridad requerida. Por favor, completa el CAPTCHA.' });
           return;
         }
         if (clientIp) { 
           const isCaptchaValid = await verifyRecaptchaV3(captchaToken, 'login_user_triggered', clientIp); 
           if (!isCaptchaValid) {
-            console.log(`Verificación CAPTCHA v3 fallida para ${rut} (user-based).`);
             recordFailedIpAttempt(clientIp); 
             res.status(401).json({ error: 'Verificación de seguridad fallida. Inténtalo de nuevo.' });
             return;
           }
-          console.log(`Verificación CAPTCHA v3 exitosa para ${rut} (user-based).`);
         } else {
           console.warn(`User-based CAPTCHA for ${rut}: Client IP is undefined. Cannot reliably verify reCAPTCHA v3.`);
           res.status(401).json({ error: 'No se pudo determinar la IP para la verificación de seguridad. Inténtalo de nuevo.' });
@@ -168,7 +155,6 @@ class AuthController {
         return { ...plainEntry, role: plainRole };
       });
       
-      console.log('DEBUG login: plainOrganizationRoleEntriesForLogin A PASAR a getHighestPriorityRole:', JSON.stringify(plainOrganizationRoleEntriesForLogin, null, 2));
 
       const highestRoleName = user ? getHighestPriorityRole(plainOrganizationRoleEntriesForLogin) : null;
       if (!user || !highestRoleName || !user.passwordHash) {
@@ -179,9 +165,7 @@ class AuthController {
         return;
       }
 
-      console.log('3. Comparando contraseña...');
       const isMatch = await bcrypt.compare(password, user.passwordHash);
-      console.log('4. Contraseña coincide:', isMatch);
 
       if (!isMatch) {
         if (clientIp) {
@@ -195,7 +179,6 @@ class AuthController {
         if (user.failedLoginAttempts >= 5) {
           user.accountLocked = true;
           responseStatus = 403; 
-          console.log(`Cuenta bloqueada para RUT ${rut}...`);
 
           await user.update({
             failedLoginAttempts: user.failedLoginAttempts,
@@ -204,7 +187,6 @@ class AuthController {
           });
 
           if (user.email === "NO TIENE") {
-            console.log(`Usuario ${user.rut} bloqueado pero sin email registrado ("NO TIENE").`);
             responseJson = {
               error: 'Cuenta bloqueada por demasiados intentos fallidos. No tiene un correo electrónico registrado para desbloquearla. Por favor, contacte a un administrador.',
               accountLocked: true
@@ -215,7 +197,6 @@ class AuthController {
               const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
               await user.update({ resetPasswordTokenHash: hashedToken, resetPasswordExpiresAt: expiresAt });
               await sendUnlockEmail(user.email, resetToken);
-              console.log(`Email de desbloqueo (válido 24h) enviado a ${user.email}`);
               responseJson = {
                 error: 'Cuenta bloqueada por demasiados intentos fallidos. Se ha enviado un correo electrónico con instrucciones para desbloquearla (válido por 24 horas).',
                 accountLocked: true
@@ -234,7 +215,6 @@ class AuthController {
              failedLoginAttempts: user.failedLoginAttempts,
              lastFailedLogin: user.lastFailedLogin
           });
-          console.log(`Contraseña incorrecta para RUT ${rut}, intento ${user.failedLoginAttempts}.`);
           responseJson = { error: 'RUT o contraseña incorrectos', accountLocked: false };
         }
 
@@ -246,13 +226,11 @@ class AuthController {
         const errorMsg = user.email === "NO TIENE"
           ? 'Cuenta bloqueada. Contacte a un administrador.'
           : 'Cuenta bloqueada. Revisa tu correo...';
-        console.log(`Intento de login para cuenta ya bloqueada: RUT ${rut}, Email: ${user.email}`);
         res.status(403).json({ error: errorMsg, accountLocked: true });
         return; 
       }
 
       if (user.lastLogin === null) {
-        console.log(`Usuario ${user.rut} está iniciando sesión por primera vez (lastLogin es null). Requiere cambio de contraseña.`);
         const tempChangeTokenPayload = { id: user.id, action: 'force-change-password' };
         const tempChangeToken = jwt.sign(tempChangeTokenPayload, config.JWT_SECRET as string, { expiresIn: '15m' });
 
@@ -266,7 +244,6 @@ class AuthController {
       }
 
       if (user.email === "NO TIENE") {
-        console.log(`Usuario ${user.rut} no tiene email registrado ("NO TIENE"). Saltando MFA y completando login.`);
         await user.update({ failedLoginAttempts: 0, lastFailedLogin: null, lastLogin: new Date() });
         if (clientIp) {
           resetIpFailedAttempts(clientIp);
@@ -283,7 +260,6 @@ class AuthController {
         return;
       }
 
-      console.log('Contraseña correcta. Iniciando flujo MFA...');
       const mfaCode = generateMfaCode();
       const saltRounds = 10;
       const mfaCodeHash = await bcrypt.hash(mfaCode, saltRounds);
@@ -291,7 +267,6 @@ class AuthController {
       await user.update({ mfaCodeHash: mfaCodeHash, mfaCodeExpiresAt: expiresAt, failedLoginAttempts: 0, lastFailedLogin: null });
       try {
         await sendVerificationCode(user.email, mfaCode);
-        console.log(`Código MFA enviado a ${user.email}`);
         res.status(200).json({
             message: 'Autenticación parcial exitosa. Se requiere verificación MFA.',
             mfaRequired: true,
@@ -314,7 +289,6 @@ class AuthController {
   async verifyMfa(req: Request, res: Response): Promise<void> {
     const { email, code } = req.body;
     try {
-      console.log(`Verificando MFA para ${email} con código ${code}`);
       const user = await User.findOne({
         where: { email },
         include: [{ 
@@ -332,7 +306,6 @@ class AuthController {
         return;
       }
       if (!user.mfaCodeHash || !user.mfaCodeExpiresAt || user.mfaCodeExpiresAt < new Date()) {
-        console.log('Código MFA no encontrado, inválido o expirado.');
         if (user.mfaCodeExpiresAt && user.mfaCodeExpiresAt < new Date()) {
             await user.update({ mfaCodeHash: null, mfaCodeExpiresAt: null });
         }
@@ -341,11 +314,9 @@ class AuthController {
       }
       const isCodeMatch = await bcrypt.compare(code, user.mfaCodeHash);
       if (!isCodeMatch) {
-        console.log('Código MFA no coincide.');
         res.status(400).json({ error: 'Código de verificación incorrecto.' });
         return;
       }
-      console.log('Código MFA correcto. Completando login.');
       await user.update({ mfaCodeHash: null, mfaCodeExpiresAt: null, lastLogin: new Date() });
       const clientIpForMfa = req.ip; 
       if (clientIpForMfa) {
@@ -358,9 +329,7 @@ class AuthController {
       };
       const jwtSecret: Secret = config.JWT_SECRET as string;
       const jwtOptions: SignOptions = { expiresIn: config.JWT_EXPIRES_IN };
-      console.log('Generando token de sesión final...');
       const token = jwt.sign(jwtPayload, jwtSecret, jwtOptions);
-      console.log('Token generado.');
       res.json({
         message: 'Verificación MFA exitosa. Login completo.',
         token,
@@ -420,8 +389,6 @@ class AuthController {
         resetPasswordExpiresAt: null
       });
 
-      console.log(`Contraseña actualizada para usuario ID ${userId}. Procediendo con el flujo post-cambio.`);
-
       const updatedUser = await User.findByPk(userId, {
         include: [{
           model: UserOrganizationRoleModel,
@@ -445,7 +412,6 @@ class AuthController {
       }
 
       if (updatedUser.email && updatedUser.email !== "NO TIENE") {
-        console.log(`Usuario ${updatedUser.rut} tiene email. Iniciando flujo MFA post-cambio de contraseña.`);
         const mfaCode = generateMfaCode();
         const mfaSaltRounds = 10;
         const mfaCodeHash = await bcrypt.hash(mfaCode, mfaSaltRounds);
@@ -458,7 +424,6 @@ class AuthController {
 
         try {
           await sendVerificationCode(updatedUser.email, mfaCode);
-          console.log(`Código MFA enviado a ${updatedUser.email} post-cambio de contraseña.`);
           res.status(200).json({
             message: 'Contraseña actualizada. Se requiere verificación MFA.',
             mfaRequired: true,
@@ -469,7 +434,6 @@ class AuthController {
           res.status(500).json({ error: 'Contraseña actualizada, pero ocurrió un error al enviar el código de verificación. Intente iniciar sesión.' });
         }
       } else {
-        console.log(`Usuario ${updatedUser.rut} no tiene email. Completando login post-cambio de contraseña.`);
         const jwtPayload = {
             id: updatedUser.id,
             role: highestRoleName,
@@ -504,24 +468,19 @@ class AuthController {
     const { email } = req.body;
 
     try {
-      console.log(`Solicitud de reseteo de contraseña para: ${email}`);
       const user = await User.findOne({ where: { email } });
       if (user && user.email !== "NO TIENE") {
-        console.log('Usuario encontrado con email funcional. Generando token de reseteo...');
         const { resetToken, hashedToken } = generateResetToken();
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await user.update({ resetPasswordTokenHash: hashedToken, resetPasswordExpiresAt: expiresAt });
         try {
           await sendPasswordResetEmail(user.email, resetToken);
-          console.log(`Email de reseteo (válido 24h) enviado a ${user.email}`);
         } catch (emailError) {
           console.error("Error al enviar email de reseteo:", emailError);
         }
       } else if (user && user.email === "NO TIENE") {
-          console.log(`Usuario ${user.rut} encontrado pero no tiene email funcional ("NO TIENE"). No se envía correo de reseteo.`);
           res.status(400).json({ error: 'El usuario no tiene un email registrado. Contacte con un administrador.' });
       } else {
-          console.log(`Usuario con email ${email} no encontrado.`);
           res.status(404).json({ error: 'Usuario no encontrado' });
       }
       res.status(200).json({ message: 'Si existe una cuenta asociada a ese email, se ha enviado un enlace para restablecer la contraseña.' });
@@ -536,7 +495,6 @@ class AuthController {
     const { email } = req.body;
 
     try {
-      console.log(`Solicitud de desbloqueo de cuenta para: ${email}`);
       const user = await User.findOne({ where: { email } });
        if (user && user.email !== "NO TIENE") {
         if (!user.accountLocked) { console.log(`La cuenta ${email} no está bloqueada...`); }
@@ -570,15 +528,12 @@ class AuthController {
 
     try {
       const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-      console.log(`Intento de reseteo/desbloqueo con token (hash buscado): ${hashedToken}`);
       const user = await User.findOne({ where: { resetPasswordTokenHash: hashedToken } });
 
       if (!user || !user.resetPasswordExpiresAt || user.resetPasswordExpiresAt < new Date()) {
-        console.log('Token inválido o expirado.');
         res.status(400).json({ error: 'El token para restablecer la contraseña es inválido o ha expirado.' });
         return;
       }
-      console.log(`Usuario encontrado para reseteo/desbloqueo: ${user.email}`);
       const saltRounds = 10;
       const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
       const wasLocked = user.accountLocked;
@@ -591,7 +546,6 @@ class AuthController {
         mfaCodeHash: null,
         mfaCodeExpiresAt: null,
       });
-      console.log(`Contraseña reseteada ${wasLocked ? 'y cuenta desbloqueada ' : ''}exitosamente para ${user.email}`);
       const successMessage = wasLocked
         ? 'Tu contraseña ha sido restablecida y tu cuenta desbloqueada exitosamente.'
         : 'Tu contraseña ha sido restablecida exitosamente.';

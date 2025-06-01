@@ -8,24 +8,60 @@ interface SchemaParts {
 }
 
 const validate = (schemaParts: SchemaParts | Joi.ObjectSchema) => {
-  return (req: Request, res: Response, next: NextFunction): void => { 
+  return (req: Request, res: Response, next: NextFunction) => { 
+    
     let schemaToValidate: SchemaParts;
 
     if (Joi.isSchema(schemaParts)) {
-      schemaToValidate = { body: schemaParts as Joi.ObjectSchema };
+      const schemaDesc = (schemaParts as any).describe();
+      
+      const hasStructuredKeys = schemaDesc.keys && (
+        schemaDesc.keys.body || 
+        schemaDesc.keys.params || 
+        schemaDesc.keys.query
+      );
+      
+      if (hasStructuredKeys) {
+        
+        const { error } = (schemaParts as Joi.ObjectSchema).validate({
+          body: req.body,
+          params: req.params,
+          query: req.query
+        }, { 
+          abortEarly: false, 
+          allowUnknown: true, 
+          stripUnknown: false 
+        });
+        
+        if (error) {
+          const errors = error.details.map((detail) => ({
+            message: detail.message.replace(/['"]/g, ''),
+            field: detail.path.join('.'),
+            location: detail.path[0] as 'body' | 'query' | 'params',
+          }));
+          res.status(400).json({ errors });
+          return;
+        }
+        
+        next();
+        return;
+        
+      } else {
+        schemaToValidate = { body: schemaParts as Joi.ObjectSchema };
+      }
     } else {
       schemaToValidate = schemaParts;
     }
 
-    const baseOptions: Joi.ValidationOptions = {
-      abortEarly: false,
-    };
-
     let allErrors: { message: string; field: string; location: 'body' | 'query' | 'params' }[] = [];
 
     if (schemaToValidate.body) {
-      const bodyOptions = { ...baseOptions, allowUnknown: true, stripUnknown: true };
-      const { error: bodyError, value: validatedBody } = schemaToValidate.body.validate(req.body, bodyOptions);
+      const { error: bodyError } = schemaToValidate.body.validate(req.body, { 
+        abortEarly: false, 
+        allowUnknown: true, 
+        stripUnknown: false 
+      });
+      
       if (bodyError) {
         const bodyErrors = bodyError.details.map((detail) => ({
           message: detail.message.replace(/['"]/g, ''),
@@ -33,14 +69,15 @@ const validate = (schemaParts: SchemaParts | Joi.ObjectSchema) => {
           location: 'body' as const,
         }));
         allErrors = allErrors.concat(bodyErrors);
-      } else {
-         req.body = validatedBody;
       }
     }
 
     if (schemaToValidate.query) {
-      const queryOptions = { ...baseOptions, allowUnknown: true, stripUnknown: false };
-      const { error: queryError, value: validatedQuery } = schemaToValidate.query.validate(req.query, queryOptions);
+      const { error: queryError } = schemaToValidate.query.validate(req.query, { 
+        abortEarly: false, 
+        allowUnknown: true, 
+        stripUnknown: false 
+      });
       if (queryError) {
         const queryErrors = queryError.details.map((detail) => ({
             message: detail.message.replace(/['"]/g, ''),
@@ -48,14 +85,15 @@ const validate = (schemaParts: SchemaParts | Joi.ObjectSchema) => {
             location: 'query' as const,
         }));
         allErrors = allErrors.concat(queryErrors);
-      } else {
-         (req as any).validatedQuery = validatedQuery; 
       }
     }
 
     if (schemaToValidate.params) {
-      const paramsOptions = { ...baseOptions, allowUnknown: true, stripUnknown: false };
-      const { error: paramsError, value: validatedParams } = schemaToValidate.params.validate(req.params, paramsOptions);
+      const { error: paramsError } = schemaToValidate.params.validate(req.params, { 
+        abortEarly: false, 
+        allowUnknown: true, 
+        stripUnknown: false 
+      });
       if (paramsError) {
         const paramsErrors = paramsError.details.map((detail) => ({
             message: detail.message.replace(/['"]/g, ''),
@@ -63,14 +101,12 @@ const validate = (schemaParts: SchemaParts | Joi.ObjectSchema) => {
             location: 'params' as const,
         }));
         allErrors = allErrors.concat(paramsErrors);
-      } else {
-         (req as any).validatedParams = validatedParams;
       }
     }
 
     if (allErrors.length > 0) {
-        console.warn('Validation Error:', JSON.stringify(allErrors, null, 2)); 
         res.status(400).json({ errors: allErrors });
+        return;
     } else {
         next();
     }

@@ -15,7 +15,6 @@ export interface WithdrawalReasonCreationAttributes extends Optional<WithdrawalR
 class WithdrawalReason extends Model<WithdrawalReasonAttributes, WithdrawalReasonCreationAttributes> implements WithdrawalReasonAttributes {
   public id!: CreationOptional<number>;
   public name!: string;
-  public !: boolean;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
