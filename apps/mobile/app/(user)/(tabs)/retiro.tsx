@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import {View,Text,ScrollView} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, Alert } from 'react-native';
 
 import GlobalBackground from '@/components/layout/GlobalBackground';
 
@@ -8,39 +8,49 @@ import PrimaryButton from '@/components/ui/buttons/PrimaryButton';
 
 import { useAppContext } from '@/context/AppContext';
 import { router } from 'expo-router';
+import { fetchParentStudents } from '@/services/withdrawals';
+
+//Estructura de datos a guardar
+interface Student {
+  id: number;
+  firstName: string;
+  lastName: string;
+  rut: string;
+}
 
 export default function SeleccionarPersonaScreen() {
-  const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
-  const { setData  } = useAppContext(); //Set de datos para contexto
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { setData } = useAppContext(); //Set de datos para contexto
 
-  //Datos de prueba
-  const personas = [
-    {
-      id: "ALU1",
-      nombre: 'David Ignacio Rubilar Yaber',
-    },
-    {
-      id: "ALU2",
-      nombre: 'Camilo Andrés Rubilar Yaber',
-    },
-  ];
+  //Manejo del loading de datos
+  useEffect(() => {
+    const loadStudents = async () => {
+      try {
+        const data = await fetchParentStudents(); //Busca los datos
+        setStudents(data); //Almacena localmente los datos (NO EN AppContext)
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'No se pudieron cargar los estudiantes');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStudents();
+  }, []);
 
   //Funcion a ejecutar cuando se apreta el boton
   const handleContinue = () => {
-    if (selectedPerson) {
-      const selected = personas.find(p => p.id === selectedPerson);
-
-      if (selected) {
-        // Se guardan datos en el contexto (sobrescribe)
-        setData({
-          alumnoSeleccionado: {
-            id: selected.id,
-            nombre: selected.nombre,
-          },
-        });
-
-        router.push('/encargadoRetiro');
-      }
+    const selected = students.find(p => p.id === selectedPersonId);
+    if (selected) {
+      setData({
+        alumnoSeleccionado: {
+          id: selected.id,
+          nombre: `${selected.firstName} ${selected.lastName}`,
+          rut: selected.rut,
+        },
+      });
+      router.push('/encargadoRetiro'); // siguiente pantalla
     }
   };
 
@@ -53,25 +63,36 @@ export default function SeleccionarPersonaScreen() {
         </Text>
 
     {/* Opciones de selección */}
-    <View className="w-full mb-8 max-h-80"> 
-      <ScrollView contentContainerClassName="space-y-4">
-        {personas.map((persona) => (
-          <SelectOptionButton
-            key={persona.id}
-            label={persona.nombre}
-            isSelected={selectedPerson === persona.id}
-            onPress={() => setSelectedPerson(persona.id)}
-          />
-        ))}
-      </ScrollView>
-    </View>
+    {loading ? (
+      <ActivityIndicator size="large" color="#0000ff" />
+      //Caso = No hay estudiantes
+    ) : students.length === 0 ? (
+      <Text className="text-center text-gray-600 mt-4">No se han encontrado estudiantes.</Text>
+    ) : (
+      //Caso = Hay datos!
+      <View className="w-full mb-8 max-h-80">
+        <ScrollView contentContainerClassName="space-y-4">
+          {/* Mapeo de los datos */}
+          {students.map((student) => (
+            <SelectOptionButton
+              key={student.id}
+              label={`${student.firstName} ${student.lastName}`}
+              sublabel={`${student.rut}`}
+              isSelected={selectedPersonId === student.id}
+              onPress={() => setSelectedPersonId(student.id)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+    )}
+
 
       {/* Botón continuar */}
       <View className="w-full px-4">
         <View className="max-w-[320px] w-full mx-auto">
           <PrimaryButton
             title="Continuar"
-            disabled={!selectedPerson}
+            disabled={!selectedPersonId}
               onPress={handleContinue} 
             />
         </View>

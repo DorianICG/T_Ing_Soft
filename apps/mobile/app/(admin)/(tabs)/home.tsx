@@ -3,7 +3,6 @@ import { ScrollView, Text } from 'react-native';
 import GlobalBackground from '@/components/layout/GlobalBackground';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
-import { FontAwesome5 } from '@expo/vector-icons';
 
 //!!!!!!!!!! REDIRECCIONAR CORRECTAMENTE UNA VEZ ESTEN LISTAS LAS VISTAS !!!!!!!!!!
 
@@ -35,7 +34,7 @@ export default function HomeScreen() {
         <OptionButton
           title="Carga de Datos"
           //onPress={() => router.navigate('/misAlumnos')}
-          icon={<Ionicons icon="document-attach" style={{ fontSize: 30, color: '#1D4ED8' }} />}
+          icon={<Ionicons name="document-attach" style={{ fontSize: 30, color: '#1D4ED8' }} />}
         />
         <OptionButton
           title="Creación Perfiles" 

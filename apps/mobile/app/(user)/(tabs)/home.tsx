@@ -19,7 +19,7 @@ export default function HomeScreen() {
 
       <OptionButton
         title="Generar Retiro"
-        onPress={() => router.navigate('/generarRetiro')}
+        onPress={() => router.navigate('/retiro')}
         icon={<Ionicons name="qr-code-outline" size={30} color="#1D4ED8" />}
       />
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, TextInput, TextInputProps, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, TextInput, TextInputProps, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons'; 
 
 interface PasswordInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
@@ -15,19 +15,28 @@ const PasswordInput: React.FC<PasswordInputProps> = ({
   placeholder,
   ...rest
 }) => {
+  const [secure, setSecure] = useState(true);
+
   return (
-    <View style={[styles.container, className ? { /* para clases tailwind si usas */ } : null]}>
+    <View style={[styles.container, className ? {  } : null]}>
       <Ionicons name="lock-closed-outline" size={24} color="#374151" style={styles.icon} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        secureTextEntry
+        secureTextEntry={secure}
         autoCapitalize="none"
         autoCorrect={false}
         style={styles.input}
         {...rest}
       />
+      <Pressable onPress={() => setSecure(!secure)}>
+        <Ionicons
+          name={secure ? 'eye-off-outline' : 'eye-outline'}
+          size={22}
+          color="gray"
+        />
+      </Pressable>
     </View>
   );
 };
