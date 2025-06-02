@@ -1,4 +1,4 @@
-import { Withdrawal, Student, User, WithdrawalReason } from '../../models';
+import { Withdrawal, Student, User, WithdrawalReason, Course } from '../../models';
 import { Transaction, Op } from 'sequelize';
 import sequelizeInstance from '../../config/database';
 import { 
@@ -27,6 +27,14 @@ export class WithdrawalService {
           id: data.studentId,
           parentId: parentUserId
         },
+        include: [
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['name'],
+            required: false
+          }
+        ],
         transaction
       });
       
@@ -50,18 +58,21 @@ export class WithdrawalService {
       
       await transaction.commit();
       
+      
       return {
         qrCode: qrResult.qrCode,
         expiresAt: qrResult.expiresAt,
         student: {
           id: student.id,
           firstName: student.firstName,
-          lastName: student.lastName
+          lastName: student.lastName,
+          courseName: student.course?.name
         },
         reason: {
           id: reason.id,
           name: reason.name
-        }
+        },
+        customReason: data.customReason
       };
       
     } catch (error) {
@@ -88,7 +99,10 @@ export class WithdrawalService {
       const qrAuth = await QrAuthorizationService.markQrAsUsed(data.qrCode, transaction);
       
       // Obtener información del inspector
-      const inspector = await User.findByPk(inspectorUserId, { transaction });
+      const inspector = await User.findByPk(inspectorUserId, { 
+        attributes: ['id', 'firstName', 'lastName'],
+        transaction 
+      });
       if (!inspector) {
         throw new Error('Inspector no encontrado');
       }
@@ -112,6 +126,8 @@ export class WithdrawalService {
       
       await transaction.commit();
       
+      const statusMessage = withdrawal.status === 'APPROVED' ? 'aprobado' : 'denegado';
+      
       return {
         id: withdrawal.id,
         status: withdrawal.status as WithdrawalStatus,
@@ -126,6 +142,11 @@ export class WithdrawalService {
           name: `${qrInfo.student.firstName} ${qrInfo.student.lastName}`,
           rut: qrInfo.student.rut
         },
+        reason: {
+          id: qrInfo.reason.id,
+          name: qrInfo.reason.name
+        },
+        customReason: qrInfo.customReason,
         notes: withdrawal.notes || undefined
       };
       
@@ -145,6 +166,14 @@ export class WithdrawalService {
       // Buscar estudiante por RUT
       const student = await Student.findOne({
         where: { rut: data.studentRut },
+        include: [
+          {
+            model: Course,
+            as: 'course',
+            attributes: ['name'],
+            required: false
+          }
+        ],
         transaction
       });
       
@@ -155,6 +184,7 @@ export class WithdrawalService {
       // Buscar apoderado por RUT
       const parent = await User.findOne({
         where: { rut: data.parentRut },
+        attributes: ['id', 'rut', 'firstName', 'lastName', 'phone'],
         transaction
       });
       
@@ -162,7 +192,7 @@ export class WithdrawalService {
         throw new Error('Apoderado no encontrado con el RUT proporcionado');
       }
       
-      // Verificar relación apoderado-estudiante usando parentId
+      // Verificar relación apoderado-estudiante
       if (student.parentId !== parent.id) {
         throw new Error('El apoderado no está autorizado para retirar a este estudiante');
       }
@@ -174,7 +204,10 @@ export class WithdrawalService {
       }
       
       // Obtener información del inspector
-      const inspector = await User.findByPk(inspectorUserId, { transaction });
+      const inspector = await User.findByPk(inspectorUserId, { 
+        attributes: ['id', 'firstName', 'lastName'],
+        transaction 
+      });
       if (!inspector) {
         throw new Error('Inspector no encontrado');
       }
@@ -207,8 +240,19 @@ export class WithdrawalService {
         student: {
           id: student.id,
           name: `${student.firstName} ${student.lastName}`,
-          rut: student.rut
+          rut: student.rut,
+          courseName: student.course?.name
         },
+        reason: {
+          id: reason.id,
+          name: reason.name
+        },
+        retriever: {
+          id: parent.id,
+          name: `${parent.firstName} ${parent.lastName}`,
+          rut: parent.rut
+        },
+        customReason: data.customReason,
         notes: withdrawal.notes || undefined
       };
       
@@ -219,43 +263,51 @@ export class WithdrawalService {
   }
   
   /**
-   * Obtener estudiantes de un apoderado para generar QR
+   *  Obtener estudiantes de un apoderado
    */
-  async getParentStudents(parentUserId: number): Promise<Array<{id: number, firstName: string, lastName: string, rut: string}>> {
+  async getParentStudents(parentUserId: number): Promise<Array<{
+    id: number; 
+    firstName: string; 
+    lastName: string; 
+    rut: string;
+    courseName?: string;
+    activeQr?: boolean;
+  }>> {
+    
     const students = await Student.findAll({
       where: { parentId: parentUserId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          attributes: ['name'],
+          required: false
+        }
+      ],
       attributes: ['id', 'firstName', 'lastName', 'rut']
     });
     
-    return students.map(student => ({
-      id: student.id,
-      firstName: student.firstName,
-      lastName: student.lastName,
-      rut: student.rut
-    }));
+    // Verificar si cada estudiante tiene QR activo
+    const studentsWithQrStatus = await Promise.all(
+      students.map(async (student) => {
+        const activeQr = await QrAuthorizationService.getActiveQrForStudent(student.id, parentUserId);
+        
+        return {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          rut: student.rut,
+          courseName: student.course?.name,
+          activeQr: !!activeQr
+        };
+      })
+    );
+    
+    return studentsWithQrStatus;
   }
   
   /**
-   * Método privado para crear registro de retiro
-   */
-  private async createWithdrawalRecord(data: ProcessWithdrawalData, transaction: Transaction): Promise<InstanceType<typeof Withdrawal>> {
-    return await Withdrawal.create({
-      qrAuthorizationId: data.qrAuthorizationId || null,
-      studentId: data.studentId,
-      organizationApproverUserId: data.inspectorUserId,
-      reasonId: data.reasonId,
-      method: data.method,
-      status: data.status,
-      contactVerified: true,
-      retrieverUserId: data.retrieverUserId || null,
-      customWithdrawalReason: data.customReason || null,
-      notes: data.notes || null,
-      withdrawalTime: new Date()
-    }, { transaction });
-  }
-  
-  /**
-   * Obtener historial completo de retiros para apoderados (todos sus estudiantes)
+   * Historial de retiros para apoderados
    */
   async getParentWithdrawalHistory(
     parentUserId: number, 
@@ -321,12 +373,26 @@ export class WithdrawalService {
         {
           model: Student,
           as: 'student',
-          attributes: ['id', 'firstName', 'lastName', 'rut']
+          attributes: ['id', 'firstName', 'lastName', 'rut'],
+          include: [
+            {
+              model: Course,
+              as: 'course',
+              attributes: ['name'],
+              required: false
+            }
+          ]
         },
         {
           model: WithdrawalReason,
           as: 'reason',
           attributes: ['id', 'name']
+        },
+        {
+          model: User,
+          as: 'retrieverUser',
+          attributes: ['id', 'firstName', 'lastName', 'rut'],
+          required: false
         }
       ],
       order: [['withdrawalTime', 'DESC']],
@@ -346,12 +412,18 @@ export class WithdrawalService {
       student: {
         id: withdrawal.student!.id,
         name: `${withdrawal.student!.firstName} ${withdrawal.student!.lastName}`,
-        rut: withdrawal.student!.rut
+        rut: withdrawal.student!.rut,
+        courseName: withdrawal.student!.course?.name
       },
       reason: {
         id: withdrawal.reason!.id,
         name: withdrawal.reason!.name
       },
+      retriever: withdrawal.retrieverUser ? {
+        id: withdrawal.retrieverUser.id,
+        name: `${withdrawal.retrieverUser.firstName} ${withdrawal.retrieverUser.lastName}`,
+        rut: withdrawal.retrieverUser.rut
+      } : undefined,
       customReason: withdrawal.customWithdrawalReason || undefined,
       notes: withdrawal.notes || undefined
     }));
@@ -364,7 +436,7 @@ export class WithdrawalService {
   }
 
   /**
-   * Obtener historial completo de retiros para inspectores/admins (todos los estudiantes)
+   * Historial de retiros para inspectores
    */
   async getInspectorWithdrawalHistory(
     filters?: {
@@ -427,7 +499,15 @@ export class WithdrawalService {
           model: Student,
           as: 'student',
           attributes: ['id', 'firstName', 'lastName', 'rut'],
-          where: Object.keys(studentWhereClause).length > 0 ? studentWhereClause : undefined
+          where: Object.keys(studentWhereClause).length > 0 ? studentWhereClause : undefined,
+          include: [
+            {
+              model: Course,
+              as: 'course',
+              attributes: ['name'],
+              required: false
+            }
+          ]
         },
         {
           model: WithdrawalReason,
@@ -458,7 +538,8 @@ export class WithdrawalService {
       student: {
         id: withdrawal.student!.id,
         name: `${withdrawal.student!.firstName} ${withdrawal.student!.lastName}`,
-        rut: withdrawal.student!.rut
+        rut: withdrawal.student!.rut,
+        courseName: withdrawal.student!.course?.name
       },
       reason: {
         id: withdrawal.reason!.id,
@@ -481,7 +562,7 @@ export class WithdrawalService {
   }
 
   /**
-   * Obtener historial de retiros de un estudiante específico (usado por apoderados e inspectores)
+   * Obtener historial de retiros de un estudiante específico
    */
   async getStudentWithdrawalHistory(studentId: number): Promise<WithdrawalResultDto[]> {
     const result = await this.getInspectorWithdrawalHistory({ studentId, limit: 100 });
@@ -489,9 +570,9 @@ export class WithdrawalService {
   }
 
   /**
-   * Obtener todas las razones de retiro disponibles
+   * Obtener motivos de retiro
    */
-  async getWithdrawalReasons(): Promise<Array<{id: number, name: string}>> {
+  async getWithdrawalReasons(): Promise<Array<{id: number, name: string, description?: string}>> {
     const reasons = await WithdrawalReason.findAll({
       attributes: ['id', 'name'],
       order: [['name', 'ASC']]
@@ -499,8 +580,30 @@ export class WithdrawalService {
     
     return reasons.map(reason => ({
       id: reason.id,
-      name: reason.name
+      name: reason.name,
+      description: `Motivo: ${reason.name}`
     }));
+  }
+
+  /**
+   * Método privado para crear registro de retiro
+   */
+  private async createWithdrawalRecord(data: ProcessWithdrawalData, transaction: Transaction): Promise<InstanceType<typeof Withdrawal>> {
+    const withdrawal = await Withdrawal.create({
+      qrAuthorizationId: data.qrAuthorizationId || null,
+      studentId: data.studentId,
+      organizationApproverUserId: data.inspectorUserId,
+      reasonId: data.reasonId,
+      method: data.method,
+      status: data.status,
+      contactVerified: true,
+      retrieverUserId: data.retrieverUserId || null,
+      customWithdrawalReason: data.customReason || null,
+      notes: data.notes || null,
+      withdrawalTime: new Date()
+    }, { transaction });
+
+    return withdrawal;
   }
 
 }

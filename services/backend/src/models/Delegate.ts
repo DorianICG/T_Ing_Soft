@@ -43,17 +43,17 @@ class Delegate extends Model<DelegateAttributes, DelegateCreationAttributes> imp
   }) {
     Delegate.belongsTo(models.User, {
       foreignKey: 'parentUserId',
-      as: 'parentUser',
+      as: 'parentUser'
     });
 
     Delegate.hasMany(models.QrAuthorization, {
       foreignKey: 'assignedDelegateId',
-      as: 'qrAuthorizations',
+      as: 'qrAuthorizations'
     });
     
     Delegate.hasMany(models.Withdrawal, {
         foreignKey: 'retrieverDelegateId',
-        as: 'withdrawalsAsRetriever',
+        as: 'withdrawalsAsRetriever'
       });
   }
 }
@@ -62,8 +62,8 @@ export const initDelegateModel = () => {
   Delegate.init(
     {
       id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-      parentUserId: { // Atributo en el modelo
-        type: DataTypes.INTEGER, allowNull: false, field: 'parent_user_id', // Columna en BD
+      parentUserId: {
+        type: DataTypes.INTEGER, allowNull: false, field: 'parent_user_id',
         references: { model: 'users', key: 'id' }
       },
       name: { type: DataTypes.STRING(255), allowNull: false },

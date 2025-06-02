@@ -31,12 +31,12 @@ class WithdrawalReason extends Model<WithdrawalReasonAttributes, WithdrawalReaso
   }) {
     WithdrawalReason.hasMany(models.QrAuthorization, {
       foreignKey: 'reasonId',
-      as: 'qrAuthorizations',
+      as: 'qrAuthorizations'
     });
 
     WithdrawalReason.hasMany(models.Withdrawal, {
       foreignKey: 'reasonId',
-      as: 'withdrawals',
+      as: 'withdrawals'
     });
   }
 }

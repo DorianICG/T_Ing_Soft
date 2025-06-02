@@ -61,27 +61,33 @@ class QrAuthorization extends Model<QrAuthorizationAttributes, QrAuthorizationCr
   }) {
     QrAuthorization.belongsTo(models.Student, {
       foreignKey: 'studentId',
-      as: 'student',
+      as: 'student'
     });
 
     QrAuthorization.belongsTo(models.User, {
       foreignKey: 'generatedByUserId',
-      as: 'generatedByUser',
+      as: 'generatedByUser'
     });
 
     QrAuthorization.belongsTo(models.WithdrawalReason, {
       foreignKey: 'reasonId',
       as: 'reason',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     QrAuthorization.belongsTo(models.Delegate, {
       foreignKey: 'assignedDelegateId',
       as: 'assignedDelegate',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
     
     QrAuthorization.hasOne(models.Withdrawal, {
         foreignKey: 'qrAuthorizationId',
         as: 'withdrawal',
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
       });
   }
 }

@@ -121,52 +121,62 @@ class Withdrawal extends Model<WithdrawalAttributes, WithdrawalCreationAttribute
   }) {
     Withdrawal.belongsTo(models.QrAuthorization, {
       foreignKey: 'qrAuthorizationId',
-      as: 'qrAuthorization',
+      as: 'qrAuthorization'
     });
 
     Withdrawal.belongsTo(models.Student, {
       foreignKey: 'studentId',
-      as: 'student',
+      as: 'student'
     });
 
     Withdrawal.belongsTo(models.User, {
       foreignKey: 'organizationApproverUserId',
-      as: 'organizationApproverUser',
+      as: 'organizationApproverUser'
     });
 
     Withdrawal.belongsTo(models.WithdrawalReason, {
       foreignKey: 'reasonId',
       as: 'reason',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     Withdrawal.belongsTo(models.User, {
       foreignKey: 'retrieverUserId',
-      as: 'retrieverUser',
+      as: 'retrieverUser'
     });
 
     Withdrawal.belongsTo(models.Delegate, {
       foreignKey: 'retrieverDelegateId',
       as: 'retrieverDelegate',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
     Withdrawal.belongsTo(models.EmergencyContact, {
       foreignKey: 'retrieverEmergencyContactId',
       as: 'retrieverEmergencyContact',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
     Withdrawal.belongsTo(models.User, {
       foreignKey: 'guardianAuthorizerUserId',
-      as: 'guardianAuthorizerUser',
+      as: 'guardianAuthorizerUser'
     });
 
     Withdrawal.belongsTo(models.EmergencyContact, {
       foreignKey: 'guardianAuthorizerEmergencyContactId',
       as: 'guardianAuthorizerEmergencyContact',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
     
     Withdrawal.belongsTo(models.Organization, {
         foreignKey: 'organizationId',
         as: 'organization',
+        onDelete: 'RESTRICT',
+        onUpdate: 'CASCADE'
       });
   }
 }

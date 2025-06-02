@@ -33,12 +33,14 @@ class Course extends Model<CourseAttributes, CourseCreationAttributes> implement
   }) {
     Course.belongsTo(models.Organization, {
       foreignKey: 'organizationId',
-      as: 'organization',
+      as: 'organization'
     });
 
     Course.hasMany(models.Student, {
       foreignKey: 'courseId',
       as: 'students',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
   }
 }
@@ -59,7 +61,6 @@ export const initCourseModel = () => {
       modelName: 'Course',
       timestamps: true,
       underscored: true,
-      //CONSTRAINT courses_name_organization_id_key UNIQUE (name, organization_id)
       indexes: [
         {
           unique: true,

@@ -5,7 +5,7 @@ import { ValidateQrRequestDto, ManualWithdrawalRequestDto } from '../utils/withd
 import Student from '../../models/Student';
 import User from '../../models/User';
 import Course from '../../models/Course';
-
+import sequelize from '../../config/database';
 export class InspectorWithdrawalController {
   
   /**
@@ -70,7 +70,7 @@ export class InspectorWithdrawalController {
       
       const data: ValidateQrRequestDto = req.body;
       
-      // Validaciones básicas (aunque ya pasaron por el middleware de validación)
+      // Validaciones básicas
       if (!data.qrCode || !data.action) {
         res.status(400).json({
           success: false,
@@ -118,7 +118,60 @@ export class InspectorWithdrawalController {
   }
   
   /**
-   * Procesar retiro manual
+   * Autorización manual sin QR (emergencias)
+   * POST /api/withdrawals/inspector/authorize-manual
+   */
+  async authorizeManually(req: Request, res: Response): Promise<void> {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      const { studentId, reasonId, customReason } = req.body;
+      const inspectorUserId = req.user?.id;
+      
+      if (!inspectorUserId) {
+        res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+        return;
+      }
+      
+      // Validaciones básicas
+      if (!studentId || !reasonId) {
+        res.status(400).json({
+          success: false,
+          message: 'Faltan campos obligatorios: studentId y reasonId'
+        });
+        return;
+      }
+      
+      const result = await QrAuthorizationService.authorizeWithoutQr(
+        studentId,
+        inspectorUserId,
+        reasonId,
+        customReason,
+        transaction
+      );
+      
+      await transaction.commit();
+      
+      res.status(201).json({
+        success: true,
+        data: result,
+        message: 'Retiro autorizado manualmente por inspector'
+      });
+    } catch (error: any) {
+      await transaction.rollback();
+      console.error('Error en autorización manual:', error);
+      res.status(400).json({ 
+        success: false,
+        message: error.message 
+      });
+    }
+  }
+  
+  /**
+   * Procesar retiro manual (método original)
    * POST /api/withdrawals/inspector/manual
    */
   async processManualWithdrawal(req: Request, res: Response): Promise<void> {
@@ -358,9 +411,130 @@ export class InspectorWithdrawalController {
         message: 'Error interno del servidor'
       });
     }
-  } 
-
-    
   }
+
+  /**
+   * Obtener estadísticas del inspector
+   * GET /api/withdrawals/inspector/stats
+   */
+  async getInspectorStats(req: Request, res: Response): Promise<void> {
+    try {
+      const inspectorUserId = req.user?.id;
+      
+      if (!inspectorUserId) {
+        res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+        return;
+      }
+  
+      const { period = 'MONTH', groupBy = 'DAY' } = req.query;
+  
+      // Calcular fechas según el período
+      const now = new Date();
+      let startDate: Date;
+  
+      switch (period) {
+        case 'TODAY':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'WEEK':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'MONTH':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'YEAR':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+  
+      // Obtener estadísticas del inspector
+      const stats = await WithdrawalService.getInspectorWithdrawalHistory({
+        approverId: inspectorUserId,
+        startDate,
+        endDate: now,
+        limit: 1000
+      });
+  
+      const totalProcessed = stats.withdrawals.length;
+      const totalApproved = stats.withdrawals.filter(w => w.status === 'APPROVED').length;
+      const totalDenied = stats.withdrawals.filter(w => w.status === 'DENIED').length;
+      const qrProcessed = stats.withdrawals.filter(w => w.method === 'QR').length;
+      const manualProcessed = stats.withdrawals.filter(w => w.method === 'MANUAL').length;
+  
+      // Agrupar por fecha
+      const groupedStats = new Map();
+      stats.withdrawals.forEach(withdrawal => {
+        const date = withdrawal.withdrawalTime;
+        let key: string;
+  
+        switch (groupBy) {
+          case 'DAY':
+            key = date.toISOString().split('T')[0];
+            break;
+          case 'WEEK':
+            const weekStart = new Date(date);
+            weekStart.setDate(date.getDate() - date.getDay());
+            key = weekStart.toISOString().split('T')[0];
+            break;
+          case 'MONTH':
+            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            break;
+          default:
+            key = date.toISOString().split('T')[0];
+        }
+  
+        if (!groupedStats.has(key)) {
+          groupedStats.set(key, { approved: 0, denied: 0, total: 0 });
+        }
+  
+        const dayStats = groupedStats.get(key);
+        dayStats.total++;
+        if (withdrawal.status === 'APPROVED') {
+          dayStats.approved++;
+        } else {
+          dayStats.denied++;
+        }
+      });
+  
+      const timeSeriesData = Array.from(groupedStats.entries()).map(([date, stats]) => ({
+        date,
+        ...stats
+      })).sort((a, b) => a.date.localeCompare(b.date));
+  
+      res.status(200).json({
+        success: true,
+        data: {
+          summary: {
+            totalProcessed,
+            totalApproved,
+            totalDenied,
+            approvalRate: totalProcessed > 0 ? Math.round((totalApproved / totalProcessed) * 100) : 0,
+            qrProcessed,
+            manualProcessed
+          },
+          period: {
+            from: startDate,
+            to: now,
+            type: period as string
+          },
+          timeSeries: timeSeriesData
+        },
+        message: 'Estadísticas obtenidas exitosamente'
+      });
+  
+    } catch (error) {
+      console.error('Error obteniendo estadísticas del inspector:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+}
 
 export default new InspectorWithdrawalController();

@@ -40,19 +40,21 @@ class Role extends Model<RoleAttributes, RoleCreationAttributes> implements Role
       through: models.UserOrganizationRole,
       foreignKey: 'roleId',
       otherKey: 'userId',
-      as: 'usersWithRole',
+      as: 'usersWithRole'
     });
 
     Role.belongsToMany(models.Organization, {
       through: models.UserOrganizationRole,
       foreignKey: 'roleId',
       otherKey: 'organizationId',
-      as: 'organizationsUsingRole',
+      as: 'organizationsUsingRole'
     });
 
     Role.hasMany(models.UserOrganizationRole, {
       foreignKey: 'roleId',
       as: 'userOrganizationRoles',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
   }
 }

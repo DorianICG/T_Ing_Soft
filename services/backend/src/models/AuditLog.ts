@@ -22,7 +22,7 @@ class AuditLog extends Model<AuditLogAttributes, AuditLogCreationAttributes> imp
   public recordId!: number | null;
   public action!: string | null;
   public userId!: ForeignKey<User['id']> | null;
-  public readonly changedAt!: Date; // Sequelize maneja CURRENT_TIMESTAMP por defecto para createdAt si timestamps:true
+  public readonly changedAt!: Date; 
 
   public readonly user?: User;
   public getUser!: BelongsToGetAssociationMixin<User>;
@@ -30,7 +30,7 @@ class AuditLog extends Model<AuditLogAttributes, AuditLogCreationAttributes> imp
   public static associate(models: { User: typeof User; }) {
     AuditLog.belongsTo(models.User, {
       foreignKey: 'userId',
-      as: 'user',
+      as: 'user'
     });
   }
 }
@@ -42,12 +42,10 @@ export const initAuditLogModel = () => {
       tableName: { type: DataTypes.STRING(50), allowNull: true, field: 'table_name' },
       recordId: { type: DataTypes.INTEGER, allowNull: true, field: 'record_id' },
       action: { type: DataTypes.STRING(10), allowNull: true },
-      userId: { // Atributo en modelo
-        type: DataTypes.INTEGER, allowNull: true, field: 'user_id', // Columna en BD
+      userId: { 
+        type: DataTypes.INTEGER, allowNull: true, field: 'user_id', 
         references: { model: 'users', key: 'id' }
       },
-      // changedAt es manejado por Sequelize como createdAt si timestamps:true y underscored:true mapea a changed_at
-      // Si quieres que se llame 'changed_at' y sea diferente de 'created_at'/'updated_at' de Sequelize:
       changedAt: {
         type: DataTypes.DATE,
         field: 'changed_at',
@@ -58,11 +56,10 @@ export const initAuditLogModel = () => {
       sequelize: sequelizeInstance,
       tableName: 'audit_log',
       modelName: 'AuditLog',
-      timestamps: true, // Esto creará createdAt y updatedAt. Si changed_at es tu único timestamp, pon false.
-                        // O renombra createdAt a changedAt en las opciones del modelo.
+      timestamps: true,
       underscored: true,
-      createdAt: 'changed_at', // Mapea Sequelize createdAt a tu columna changed_at
-      updatedAt: false,      // Deshabilita updatedAt si no lo usas para audit_log
+      createdAt: 'changed_at', 
+      updatedAt: false, 
     }
   );
   return AuditLog;

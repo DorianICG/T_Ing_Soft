@@ -89,24 +89,39 @@ class AdminStudentService {
       // 6. Manejo del RUT del padre
       if (parentRut && parentRut.trim() !== '') {
         if (!validarRut(parentRut)) {
-          throw new Error('El RUT del padre no es válido o tiene un formato incorrecto.');
+          throw new Error('El RUT del apoderado no es válido o tiene un formato incorrecto.');
         }
         const formattedParentRut = formatearRut(parentRut);
         const parentUser = await User.findOne({
-          where: { rut: formattedParentRut },
+          where: { 
+            rut: formattedParentRut,
+            isActive: true
+          },
           include: [{
             model: UserOrganizationRole,
             as: 'organizationRoleEntries',
             where: { organizationId: organizationId },
+            include: [
+              {
+                model: Role,
+                as: 'role',
+                attributes: ['name']
+              }
+            ],
             required: true,
           }],
           transaction: t,
         });
+        
         if (!parentUser) {
           throw new Error(
-            `El padre con el RUT ${formattedParentRut} no se encuentra registrado en la organización con ID ${organizationId} o no tiene un rol asignado en ella.`
+            `El usuario con RUT ${formattedParentRut} no se encuentra registrado en la organización con ID ${organizationId}, no tiene un rol asignado en ella, o está inactivo.`
           );
         }
+
+        const parentRoles = parentUser.organizationRoleEntries?.map(entry => entry.role?.name) || [];
+        console.log(`Asignando como apoderado a: ${parentUser.firstName} ${parentUser.lastName} (${formattedParentRut}) con rol(es): ${parentRoles.join(', ')}`);
+
         studentDataToCreate.parentId = parentUser.id; 
       }
 
@@ -217,18 +232,32 @@ class AdminStudentService {
             }
             const formattedParentRut = formatearRut(parentRut);
             const parent = await User.findOne({
-              where: { rut: formattedParentRut },
+              where: { 
+                rut: formattedParentRut,
+                isActive: true 
+              },
               include: [{
                 model: UserOrganizationRole,
                 as: 'organizationRoleEntries',
                 where: { organizationId }, 
+                include: [
+                  {
+                    model: Role,
+                    as: 'role',
+                    attributes: ['name']
+                  }
+                ],
                 required: true
               }],
               transaction
             });
+
             if (!parent) {
-              throw new Error(`Apoderado con RUT ${formattedParentRut} no encontrado o no pertenece a la organización ID ${organizationId}.`);
+              throw new Error(`Usuario con RUT ${formattedParentRut} no encontrado, no pertenece a la organización ID ${organizationId}, o está inactivo.`);
             }
+            const parentRoles = parent.organizationRoleEntries?.map(entry => entry.role?.name) || [];
+            console.log(`Bulk - Asignando apoderado: ${parent.firstName} ${parent.lastName} (${formattedParentRut}) - Roles: ${parentRoles.join(', ')}`);
+          
             parentUserId = parent.id;
           }
 
@@ -252,20 +281,13 @@ class AdminStudentService {
 
       const hasErrors = results.some(r => r.status === 'error');
       if (hasErrors) {
-        await transaction.rollback();
-         console.log('Errores encontrados en la carga masiva de estudiantes. Realizando rollback.');
-         const finalResults = results.map(r => {
-            if (r.status === 'success') {
-                return { ...r, status: 'error' as 'error', message: 'La creación fue revertida debido a otros errores en el lote.' };
-            }
-            return r;
-         });
-        return finalResults;
+        await transaction.commit();
+
+        return results;
       } else {
         await transaction.commit();
       }
       return results;
-
     } catch (batchError: any) {
       await transaction.rollback();
       console.error('Error catastrófico durante la carga masiva de estudiantes, rollback realizado:', batchError.message, batchError.stack);
@@ -286,6 +308,59 @@ class AdminStudentService {
             rowNumber: studentRaw.originalRowNumber
         }));
       }
+    }
+  }
+
+  // OBTENER APODERADOS DISPOBIBLES
+  async getAvailableParents(organizationId: number): Promise<any[]> {
+    try {
+      const availableUsers = await User.findAll({
+        where: { isActive: true },
+        include: [
+          {
+            model: UserOrganizationRole,
+            as: 'organizationRoleEntries',
+            where: { organizationId },
+            include: [
+              {
+                model: Role,
+                as: 'role',
+                attributes: ['name']
+              },
+              {
+                model: Organization,
+                as: 'organization',
+                attributes: ['name']
+              }
+            ],
+            required: true
+          }
+        ],
+        order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+      });
+
+      return availableUsers.map(user => {
+        const userJson = user.toJSON() as any;
+        const roles = userJson.organizationRoleEntries?.map((entry: any) => entry.role?.name) || [];
+
+        return {
+          id: userJson.id,
+          rut: userJson.rut,
+          firstName: userJson.firstName,
+          lastName: userJson.lastName,
+          fullName: `${userJson.firstName} ${userJson.lastName}`,
+          email: userJson.email,
+          phone: userJson.phone,
+          roles: roles,
+          isActive: userJson.isActive,
+          displayText: `${userJson.firstName} ${userJson.lastName} (${userJson.rut}) - ${roles.join(', ')}`,
+          roleDisplay: roles.join(', ')
+        };
+      });
+
+    } catch (error: any) {
+      console.error('Error obteniendo usuarios disponibles como apoderados:', error);
+      throw new Error('Error al obtener la lista de usuarios disponibles.');
     }
   }
 
@@ -351,7 +426,21 @@ class AdminStudentService {
           {
             model: User,
             as: 'parent',
-            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone'],
+            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone', 'email'],
+            include: [
+              {
+                model: UserOrganizationRole,
+                as: 'organizationRoleEntries',
+                include: [
+                  {
+                    model: Role,
+                    as: 'role',
+                    attributes: ['name']
+                  }
+                ],
+                required: false
+              }
+            ],
             required: false
           },
           {
@@ -364,41 +453,52 @@ class AdminStudentService {
         limit,
         offset
       });
-    
-      const formattedStudents = students.map(student => ({
-        id: student.id,
-        rut: student.rut,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        fullName: `${student.firstName} ${student.lastName}`,
-        birthDate: student.birthDate,
-        course: student.course ? {
-          id: student.course.id,
-          name: student.course.name
-        } : null,
-        parent: student.parent ? {
-          id: student.parent.id,
-          rut: student.parent.rut,
-          firstName: student.parent.firstName,
-          lastName: student.parent.lastName,
-          fullName: `${student.parent.firstName} ${student.parent.lastName}`,
-          phone: student.parent.phone
-        } : null,
-        organization: student.organization ? {
-          id: student.organization.id,
-          name: student.organization.name
-        } : null,
-        createdAt: student.createdAt,
-        updatedAt: student.updatedAt
-      }));
-    
+
+      const formattedStudents = students.map(student => {
+        let parentInfo = null;
+        if (student.parent) {
+          const parentRoles = student.parent.organizationRoleEntries?.map((entry: any) => entry.role?.name) || [];
+          parentInfo = {
+            id: student.parent.id,
+            rut: student.parent.rut,
+            firstName: student.parent.firstName,
+            lastName: student.parent.lastName,
+            fullName: `${student.parent.firstName} ${student.parent.lastName}`,
+            phone: student.parent.phone,
+            email: student.parent.email,
+            roles: parentRoles,
+            roleDisplay: parentRoles.join(', ')
+          };
+        }
+
+        return {
+          id: student.id,
+          rut: student.rut,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          fullName: `${student.firstName} ${student.lastName}`,
+          birthDate: student.birthDate,
+          course: student.course ? {
+            id: student.course.id,
+            name: student.course.name
+          } : null,
+          parent: parentInfo,
+          organization: student.organization ? {
+            id: student.organization.id,
+            name: student.organization.name
+          } : null,
+          createdAt: student.createdAt,
+          updatedAt: student.updatedAt
+        };
+      });
+
       return {
         students: formattedStudents,
         total: count,
         totalPages: Math.ceil(count / limit),
         currentPage: page
       };
-    
+
     } catch (error: any) {
       console.error('Error obteniendo estudiantes:', error);
       throw new Error('Error al obtener la lista de estudiantes.');
@@ -409,7 +509,7 @@ class AdminStudentService {
   async getStudent(studentId: number, adminOrganizations: Array<{ id: number; name: string }>): Promise<any | null> {
     try {
       const allowedOrgIds = adminOrganizations.map(org => org.id);
-    
+
       const student = await Student.findOne({
         where: {
           id: studentId,
@@ -425,6 +525,20 @@ class AdminStudentService {
             model: User,
             as: 'parent',
             attributes: ['id', 'rut', 'firstName', 'lastName', 'phone', 'email'],
+            include: [
+              {
+                model: UserOrganizationRole,
+                as: 'organizationRoleEntries',
+                include: [
+                  {
+                    model: Role,
+                    as: 'role',
+                    attributes: ['name']
+                  }
+                ],
+                required: false
+              }
+            ],
             required: false
           },
           {
@@ -434,11 +548,27 @@ class AdminStudentService {
           }
         ]
       });
-    
+
       if (!student) {
         return null;
       }
-    
+
+      let parentInfo = null;
+      if (student.parent) {
+        const parentRoles = student.parent.organizationRoleEntries?.map((entry: any) => entry.role?.name) || [];
+        parentInfo = {
+          id: student.parent.id,
+          rut: student.parent.rut,
+          firstName: student.parent.firstName,
+          lastName: student.parent.lastName,
+          fullName: `${student.parent.firstName} ${student.parent.lastName}`,
+          phone: student.parent.phone,
+          email: student.parent.email,
+          roles: parentRoles,
+          roleDisplay: parentRoles.join(', ')
+        };
+      }
+
       return {
         id: student.id,
         rut: student.rut,
@@ -450,15 +580,7 @@ class AdminStudentService {
           id: student.course.id,
           name: student.course.name
         } : null,
-        parent: student.parent ? {
-          id: student.parent.id,
-          rut: student.parent.rut,
-          firstName: student.parent.firstName,
-          lastName: student.parent.lastName,
-          fullName: `${student.parent.firstName} ${student.parent.lastName}`,
-          phone: student.parent.phone,
-          email: student.parent.email
-        } : null,
+        parent: parentInfo,
         organization: student.organization ? {
           id: student.organization.id,
           name: student.organization.name
@@ -466,7 +588,7 @@ class AdminStudentService {
         createdAt: student.createdAt,
         updatedAt: student.updatedAt
       };
-    
+
     } catch (error: any) {
       console.error('Error obteniendo estudiante:', error);
       throw new Error('Error al obtener el estudiante.');
@@ -561,21 +683,36 @@ class AdminStudentService {
           
           const formattedParentRut = formatearRut(updateData.parentRut);
           const parentUser = await User.findOne({
-            where: { rut: formattedParentRut },
+            where: { 
+              rut: formattedParentRut,
+              isActive: true 
+            },
             include: [{
               model: UserOrganizationRole,
               as: 'organizationRoleEntries',
               where: { organizationId: existingStudent.organizationId },
+              include: [
+                {
+                  model: Role,
+                  as: 'role',
+                  attributes: ['name']
+                }
+              ],
               required: true
             }],
             transaction: t
           });
         
           if (!parentUser) {
-            throw new Error(`El apoderado con RUT ${formattedParentRut} no está registrado en la organización.`);
+            throw new Error(`El usuario con RUT ${formattedParentRut} no está registrado en la organización, no tiene rol asignado, o está inactivo.`);
           }
+
+          const parentRoles = parentUser.organizationRoleEntries?.map(entry => entry.role?.name) || [];
+          console.log(`Actualizando apoderado a: ${parentUser.firstName} ${parentUser.lastName} (${formattedParentRut}) - Roles: ${parentRoles.join(', ')}`);
+
           updatePayload.parentId = parentUser.id;
         } else {
+          console.log(`Removiendo apoderado del estudiante ID ${studentId}`);
           updatePayload.parentId = null;
         }
       }

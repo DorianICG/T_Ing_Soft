@@ -67,7 +67,6 @@ class OrganizationAccessService {
     return requiredRoleNames.some(reqRole => userRoleNamesInOrg.includes(reqRole.toUpperCase()));
   }
 
-
   async getEffectiveRolesForUserInOrganization(userId: number, organizationId: number): Promise<RoleAttributes[]> {
     const userOrgRoles = await UserOrganizationRole.findAll({
       where: { userId, organizationId },

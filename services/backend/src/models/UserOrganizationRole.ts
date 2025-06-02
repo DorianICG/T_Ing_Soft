@@ -40,17 +40,17 @@ class UserOrganizationRole extends Model<UserOrganizationRoleAttributes, UserOrg
   }) {
     UserOrganizationRole.belongsTo(models.User, {
       foreignKey: 'userId',
-      as: 'user',
+      as: 'user'
     });
 
     UserOrganizationRole.belongsTo(models.Organization, {
       foreignKey: 'organizationId',
-      as: 'organization',
+      as: 'organization'
     });
 
     UserOrganizationRole.belongsTo(models.Role, {
       foreignKey: 'roleId',
-      as: 'role',
+      as: 'role'
     });
   }
 }
@@ -75,7 +75,7 @@ export const initUserOrganizationRoleModel = () => {
       roleId: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        primaryKey: true,
+        primaryKey: false,
         references: { model: 'roles', key: 'id' },
         field: 'role_id',
       },

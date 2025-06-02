@@ -42,17 +42,17 @@ class EmergencyContact extends Model<EmergencyContactAttributes, EmergencyContac
   }) {
     EmergencyContact.belongsTo(models.User, {
       foreignKey: 'parentUserId',
-      as: 'parentUser',
+      as: 'parentUser'
     });
 
     EmergencyContact.hasMany(models.Withdrawal, {
         foreignKey: 'retrieverEmergencyContactId',
-        as: 'withdrawalsAsRetriever',
+        as: 'withdrawalsAsRetriever'
       });
   
     EmergencyContact.hasMany(models.Withdrawal, {
         foreignKey: 'guardianAuthorizerEmergencyContactId',
-        as: 'withdrawalsAsGuardianAuthorizer',
+        as: 'withdrawalsAsGuardianAuthorizer'
       });
   }
 }
@@ -61,8 +61,8 @@ export const initEmergencyContactModel = () => {
   EmergencyContact.init(
     {
       id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-      parentUserId: { // Atributo en el modelo
-        type: DataTypes.INTEGER, allowNull: false, field: 'parent_user_id', // Columna en BD
+      parentUserId: {
+        type: DataTypes.INTEGER, allowNull: false, field: 'parent_user_id',
         references: { model: 'users', key: 'id' }
       },
       name: { type: DataTypes.STRING(100), allowNull: false },

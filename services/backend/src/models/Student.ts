@@ -60,27 +60,35 @@ class Student extends Model<StudentAttributes, StudentCreationAttributes> implem
   }) {
     Student.belongsTo(models.User, {
       foreignKey: 'parentId',
-      as: 'parent',
+      as: 'parent'
     });
 
     Student.belongsTo(models.Organization, {
       foreignKey: 'organizationId',
       as: 'organization',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     Student.belongsTo(models.Course, {
       foreignKey: 'courseId',
       as: 'course',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     Student.hasMany(models.Withdrawal, {
       foreignKey: 'studentId',
       as: 'withdrawals',
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     });
 
     Student.hasMany(models.QrAuthorization, {
       foreignKey: 'studentId',
-      as: 'qrAuthorizations'
+      as: 'qrAuthorizations',
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     });
   }
 }

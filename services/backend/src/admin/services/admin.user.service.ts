@@ -53,6 +53,11 @@ export type ReturnedUserAttributes = Omit<UserAttributes, 'passwordHash'>;
 class AdminUserService {
   // CREAR USUARIO
   async createUser(data: UserCreationRequestData, adminUser: AuthenticatedAdminUser): Promise<ReturnedUserAttributes> {
+    const allowedRoles = ['PARENT', 'INSPECTOR'];
+    if (!allowedRoles.includes(data.roleName)) {
+      throw new Error(`Los administradores solo pueden crear usuarios con roles: ${allowedRoles.join(', ')}.`);
+    }
+
     if (!adminUser || !adminUser.adminOrganizations || adminUser.adminOrganizations.length === 0) {
         throw new Error("El usuario administrador no tiene organizaciones válidas asignadas o no se pudieron determinar.");
     }
@@ -136,23 +141,37 @@ class AdminUserService {
 
     const t = await sequelize.transaction();
 
-    try {
-      const newUser = await User.create(creationAttributes, { transaction: t });
-      
-      await UserOrganizationRole.create({
-          userId: newUser.id,
-          organizationId: targetOrganizationId, 
-          roleId: roleForNewUser.id,
+  try {
+    const newUser = await User.create(creationAttributes, { transaction: t });
+    
+    const existingRole = await UserOrganizationRole.findOne({
+      where: {
+        userId: newUser.id,
+        organizationId: targetOrganizationId
+      },
+      transaction: t
+    });
+
+    if (existingRole) {
+      await existingRole.update({
+        roleId: roleForNewUser.id
       }, { transaction: t });
+    } else {
+      await UserOrganizationRole.create({
+        userId: newUser.id,
+        organizationId: targetOrganizationId, 
+        roleId: roleForNewUser.id,
+      }, { transaction: t });
+    }
 
-      await t.commit();
+    await t.commit();
 
-      const userToReturn = newUser.toJSON() as UserAttributes;
-      const { passwordHash: omitPassword, ...returnedUser } = userToReturn; 
+    const userToReturn = newUser.toJSON() as UserAttributes;
+    const { passwordHash: omitPassword, ...returnedUser } = userToReturn; 
 
-      return returnedUser as ReturnedUserAttributes;
+    return returnedUser as ReturnedUserAttributes;
 
-    } catch (error: any) {
+  } catch (error: any) {
       await t.rollback();
       console.error('Error al crear usuario y asignar rol/organización:', error);
       
@@ -428,6 +447,13 @@ class AdminUserService {
             model: UserOrganizationRole,
             as: 'organizationRoleEntries',
             where: { organizationId: { [Op.in]: allowedOrgIds } },
+            include: [
+              {
+                model: Role,
+                as: 'role',
+                attributes: ['name']
+              }
+            ],
             required: true
           }
         ],
@@ -436,6 +462,20 @@ class AdminUserService {
   
       if (!existingUser) {
         throw new Error('Usuario no encontrado o no tiene permisos para editarlo.');
+      }
+  
+      const currentRoles = existingUser.organizationRoleEntries?.map(entry => entry.role?.name) || [];
+      const isCurrentlyAdmin = currentRoles.includes('ADMIN');
+      
+      if (isCurrentlyAdmin) {
+        throw new Error('No se puede modificar usuarios con rol de administrador.');
+      }
+  
+      if (updateData.roleName) {
+        const allowedRoles = ['PARENT', 'INSPECTOR'];
+        if (!allowedRoles.includes(updateData.roleName)) {
+          throw new Error(`Solo se pueden asignar los roles: ${allowedRoles.join(', ')}.`);
+        }
       }
   
       const updatePayload: any = {};
@@ -456,9 +496,70 @@ class AdminUserService {
         updatePayload.isActive = updateData.isActive;
       }
   
-      await existingUser.update(updatePayload, { transaction: t });
-      await t.commit();
+      if (Object.keys(updatePayload).length > 0) {
+        await existingUser.update(updatePayload, { transaction: t });
+      }
   
+      if (updateData.roleName) {
+        const newRole = await Role.findOne({ 
+          where: { name: updateData.roleName },
+          transaction: t 
+        });
+        
+        if (!newRole) {
+          throw new Error(`Rol '${updateData.roleName}' no encontrado.`);
+        }
+      
+        let targetOrgId = updateData.organizationId;
+        if (!targetOrgId && allowedOrgIds.length === 1) {
+          targetOrgId = allowedOrgIds[0];
+        } else if (!targetOrgId) {
+          throw new Error('Debe especificar organizationId para cambiar el rol.');
+        }
+      
+        const existingOrgRoles = await UserOrganizationRole.findAll({
+          where: {
+            userId: userId,
+            organizationId: targetOrgId
+          },
+          transaction: t
+        });
+      
+        console.log(`🔍 DEBUGGING ESPECÍFICO:`);
+        console.log(`- userId: ${userId}`);
+        console.log(`- targetOrgId: ${targetOrgId}`);
+        console.log(`- newRole.id: ${newRole.id}`);
+        console.log(`- existingOrgRoles.length: ${existingOrgRoles.length}`);
+        
+        if (existingOrgRoles.length > 0) {
+          console.log(`- roleToUpdate.roleId ACTUAL: ${existingOrgRoles[0].roleId}`);
+          console.log(`- ¿Necesita cambio? ${existingOrgRoles[0].roleId !== newRole.id}`);
+          
+          // ✅ ACTUALIZAR ROL EXISTENTE (no crear)
+          const roleToUpdate = existingOrgRoles[0];
+          await roleToUpdate.update({
+            roleId: newRole.id
+          }, { transaction: t });
+          
+          console.log(`✅ Rol actualizado de ${roleToUpdate.roleId} a ${newRole.id}`);
+          
+          // ✅ LIMPIAR roles duplicados si existen
+          if (existingOrgRoles.length > 1) {
+            console.log(`🧹 Eliminando ${existingOrgRoles.length - 1} roles duplicados`);
+            for (let i = 1; i < existingOrgRoles.length; i++) {
+              await existingOrgRoles[i].destroy({ transaction: t });
+            }
+          }
+        } else {
+          // ❌ No debería pasar si el usuario ya existe
+          throw new Error(`Usuario no tiene rol asignado en la organización ${targetOrgId}.`);
+        }
+        
+        console.log(`🎯 Cambio de rol completado: ${updateData.roleName}`);
+      }
+      
+      await t.commit();
+      
       return await this.getUser(userId, adminUser.adminOrganizations || []);
   
     } catch (error: any) {
@@ -482,6 +583,13 @@ class AdminUserService {
             model: UserOrganizationRole,
             as: 'organizationRoleEntries',
             where: { organizationId: { [Op.in]: allowedOrgIds } },
+            include: [
+              {
+                model: Role,
+                as: 'role',
+                attributes: ['name']
+              }
+            ],
             required: true
           }
         ],
@@ -492,7 +600,13 @@ class AdminUserService {
         throw new Error('Usuario no encontrado o no tiene permisos para eliminarlo.');
       }
   
-      // Eliminar las relaciones organización-rol primero
+      const currentRoles = existingUser.organizationRoleEntries?.map(entry => entry.role?.name) || [];
+      const isCurrentlyAdmin = currentRoles.includes('ADMIN');
+      
+      if (isCurrentlyAdmin) {
+        throw new Error('No se puede eliminar usuarios con rol de administrador.');
+      }
+  
       await UserOrganizationRole.destroy({
         where: {
           userId: userId,
@@ -501,7 +615,6 @@ class AdminUserService {
         transaction: t
       });
   
-      // Si el usuario no tiene más relaciones en otras organizaciones, eliminarlo
       const remainingRoles = await UserOrganizationRole.count({
         where: { userId },
         transaction: t

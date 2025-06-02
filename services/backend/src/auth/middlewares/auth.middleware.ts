@@ -151,3 +151,4 @@ export const verifyForceChangeToken = (req: Request, res: Response, next: NextFu
 export const isAdmin = authenticate(['ADMIN']);
 export const isInspector = authenticate(['INSPECTOR', 'ADMIN']); 
 export const isParent = authenticate(['PARENT', 'INSPECTOR', 'ADMIN']);
+export const isAuthenticated = authenticate();

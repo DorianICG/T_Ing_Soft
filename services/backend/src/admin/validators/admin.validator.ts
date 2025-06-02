@@ -86,7 +86,7 @@ const nameSchema = (fieldName: string, maxLength: number = 50) => Joi.string()
     'any.required': `El ${fieldName} es requerido`,
   });
 
-const validUserRoles = ['PARENT', 'INSPECTOR', 'ADMIN'];
+const validUserRoles = ['PARENT', 'INSPECTOR'];
 
 const roleNameSchema = Joi.string()
   .valid(...validUserRoles)
@@ -127,75 +127,74 @@ const parentRutSchemaOptional = Joi.string()
       return value; 
     }
     if (!validarRut(value)) { 
-      return helpers.error('any.invalid', { message: `El RUT del padre no es válido o no tiene el formato correcto.` });
+      return helpers.error('any.invalid', { message: `El RUT del padre/tutor no es válido o no tiene el formato correcto.` });
     }
     const rutFormateado = formatearRut(value);
     if (!rutFormateado || !rutFormateado.includes('-')) {
-        return helpers.error('any.invalid', { message: `Error interno al formatear el RUT del padre después de la validación.` });
+        return helpers.error('any.invalid', { message: `Error interno al formatear el RUT del padre/tutor después de la validación.` });
     }
     return rutFormateado;
   })
   .messages({
-    'any.invalid': `El RUT del padre no es válido o no tiene el formato correcto si se proporciona.`
+    'any.invalid': `El RUT del padre/tutor no es válido o no tiene el formato correcto si se proporciona.`
   });
 
 // --- USER SCHEMAS ---
 
 export const createUserSchema = Joi.object({
-  firstName: Joi.string().trim().min(2).max(50).required().messages({
-    'string.base': 'El nombre debe ser una cadena de texto.',
-    'string.empty': 'El nombre es requerido.',
-    'string.min': 'El nombre debe tener al menos {#limit} caracteres.',
-    'string.max': 'El nombre no debe exceder los {#limit} caracteres.',
-    'any.required': 'El nombre es requerido.'
-  }),
-  lastName: Joi.string().trim().min(2).max(50).required().messages({
-    'string.base': 'El apellido debe ser una cadena de texto.',
-    'string.empty': 'El apellido es requerido.',
-    'string.min': 'El apellido debe tener al menos {#limit} caracteres.',
-    'string.max': 'El apellido no debe exceder los {#limit} caracteres.',
-    'any.required': 'El apellido es requerido.'
-  }),
-  rut: rutSchema,
-  email: Joi.string().trim().email({ tlds: { allow: false } }).allow('', null).empty(['', null]).default('NO TIENE').max(100).messages({
-    'string.email': 'El email debe tener un formato válido.',
-    'string.max': 'El email no debe exceder los {#limit} caracteres.'
-  }),
-  phone: Joi.string().trim().allow('', null).empty(['', null]).default('NO TIENE').max(15).pattern(/^[0-9+]*$/).messages({
-    'string.base': 'El teléfono debe ser una cadena de texto.',
-    'string.pattern.base': 'El teléfono solo puede contener números y el símbolo "+".',
-    'string.max': 'El teléfono no debe exceder los {#limit} caracteres.'
-  }),
-  password: Joi.string().min(6).max(100).optional().allow('', null).messages({ 
-    'string.base': 'La contraseña debe ser una cadena de texto.',
-    'string.min': 'La contraseña debe tener al menos {#limit} caracteres.',
-    'string.max': 'La contraseña no debe exceder los {#limit} caracteres.'
-  }),
-  roleName: Joi.string().trim().uppercase().required().valid(...validUserRoles).messages({ 
-    'string.empty': 'El nombre del rol es requerido.',
-    'any.only': `El rol debe ser uno de los siguientes: ${validUserRoles.join(', ')}.`,
-    'any.required': 'El nombre del rol es requerido.'
-  }),
-  isActive: Joi.boolean().optional().default(true).messages({
-    'boolean.base': 'El estado activo debe ser un valor booleano.'
-  }),
-  organizationId: Joi.number().integer().positive().optional().messages({
-    'number.base': 'El ID de la organización debe ser un número entero positivo.',
-    'number.positive': 'El ID de la organización debe ser un número entero positivo.',
-  }),
-});
-
-export const updateUserSchema = Joi.object({
-  firstName: nameSchema('nombre').optional(),
-  lastName: nameSchema('apellidos').optional(),
-  rut: rutBaseSchema('RUT').optional(), 
+  firstName: nameSchema('nombre', 50),       
+  lastName: nameSchema('apellido', 50),      
+  rut: rutSchema,            
   email: emailSchema,
   phone: phoneSchema,
   password: strongPasswordSchema.optional(),
-  roleName: roleNameSchema.optional(),
+  roleName: Joi.string()
+    .valid(...validUserRoles)
+    .trim()
+    .uppercase()
+    .required()
+    .messages({
+      'any.only': `El rol debe ser uno de: ${validUserRoles.join(', ')}`,
+      'string.empty': 'El rol es requerido',
+      'any.required': 'El rol es requerido',
+    }),
+  isActive: Joi.boolean().optional().default(true),
+  organizationId: Joi.number().integer().positive().optional()
+});
+
+export const updateUserSchema = Joi.object({
+  firstName: nameSchema('nombre', 50).optional(),
+  lastName: nameSchema('apellido', 50).optional(),
+  email: emailSchema,
+  phone: phoneSchema,
+  roleName: Joi.string()
+    .valid(...validUserRoles)
+    .trim()
+    .uppercase()
+    .optional()
+    .messages({
+      'any.only': `El rol debe ser uno de: ${validUserRoles.join(', ')}`,
+    }),
   isActive: Joi.boolean().optional(),
-  organizationId: Joi.number().integer().positive().optional(),
-}).min(1);
+  organizationId: Joi.number().integer().positive().optional()
+}).min(1).messages({
+  'object.min': 'Debe proporcionar al menos un campo para actualizar.'
+});
+
+export const changeUserPasswordSchema = Joi.object({
+  params: Joi.object({
+    id: Joi.number().integer().positive().required()
+  }),
+  body: Joi.object({
+    newPassword: strongPasswordSchema.required(),
+    confirmPassword: Joi.string()
+      .valid(Joi.ref('newPassword'))
+      .required()
+      .messages({
+        'any.only': 'La confirmación debe coincidir con la nueva contraseña.'
+      })
+  })
+});
 
 // --- STUDENT SCHEMAS ---
 
@@ -342,6 +341,7 @@ export const toggleUserStatusSchema = Joi.object({
 export const createUserSchemaWithBody = Joi.object({
   body: createUserSchema
 });
+
 export const updateUserSchemaWithParams = Joi.object({
   params: Joi.object({
     id: Joi.number().integer().positive().required()
@@ -370,6 +370,7 @@ export const updateCourseSchemaWithParams = Joi.object({
   }),
   body: updateCourseSchema
 });
+
 
 // --- SCHEMA GENERAL PARA QUERY ---
 

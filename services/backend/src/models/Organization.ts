@@ -58,35 +58,41 @@ class Organization extends Model<OrganizationAttributes, OrganizationCreationAtt
     Organization.hasMany(models.Course, {
       foreignKey: 'organizationId',
       as: 'courses',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     Organization.hasMany(models.Student, {
       foreignKey: 'organizationId',
       as: 'students',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     Organization.hasMany(models.UserOrganizationRole, {
       foreignKey: 'organizationId',
       as: 'userOrganizationRoles',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     Organization.belongsToMany(models.User, {
       through: models.UserOrganizationRole,
       foreignKey: 'organizationId',
       otherKey: 'userId',
-      as: 'users',
+      as: 'users'
     });
 
     Organization.belongsToMany(models.Role, {
       through: models.UserOrganizationRole,
       foreignKey: 'organizationId',
       otherKey: 'roleId',
-      as: 'roles',
+      as: 'roles'
     });
     
     Organization.hasMany(models.Withdrawal, {
         foreignKey: 'organizationId',
-        as: 'withdrawals',
+        as: 'withdrawals'
       });
   }
 }

@@ -4,8 +4,12 @@ import { isParent } from '../../auth/middlewares/auth.middleware';
 import validate from '../../middlewares/validation.middleware';
 import {
   generateQrSchema,
+  getHistorySchema,
+  getActiveQrsSchema,
+  resendQrSchema,
   getStudentHistorySchema,
-  getHistorySchema
+  getStatsSchema,
+  cancelQrSchema 
 } from '../validators/parent_withdrawal.validators';
 
 const router = Router();
@@ -13,11 +17,15 @@ const router = Router();
 // Aplicar middleware de autenticación a todas las rutas
 router.use(isParent);
 
-// Rutas
+
 router.get('/students', ParentWithdrawalController.getMyStudents);
 router.get('/reasons', ParentWithdrawalController.getWithdrawalReasons);
-router.post('/generate-qr', validate(generateQrSchema), ParentWithdrawalController.generateQrCode);
+router.get('/stats', validate(getStatsSchema), ParentWithdrawalController.getMyStats);
+router.get('/active-qrs', validate(getActiveQrsSchema), ParentWithdrawalController.getMyActiveQrs);
 router.get('/history', validate(getHistorySchema), ParentWithdrawalController.getMyWithdrawalHistory);
 router.get('/students/:studentId/history', validate(getStudentHistorySchema), ParentWithdrawalController.getStudentHistory);
+router.post('/generate-qr', validate(generateQrSchema), ParentWithdrawalController.generateQrCode);
+router.post('/students/:studentId/resend-qr', validate(resendQrSchema), ParentWithdrawalController.resendActiveQr);
+router.delete('/qr/:qrAuthId/cancel', validate(cancelQrSchema), ParentWithdrawalController.cancelActiveQr);
 
 export default router;

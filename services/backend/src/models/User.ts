@@ -131,7 +131,9 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
   }) {
     this.hasMany(models.UserOrganizationRole, {
       foreignKey: 'userId',
-      as: 'organizationRoleEntries'
+      as: 'organizationRoleEntries',
+      onDelete: 'RESTRICT',
+      onUpdate: 'CASCADE'
     });
 
     this.belongsToMany(models.Organization, {
@@ -150,37 +152,51 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
 
     this.hasMany(models.Student, {
       foreignKey: 'parentId',
-      as: 'studentsSupervised'
+      as: 'studentsSupervised',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
     this.hasMany(models.EmergencyContact, {
       foreignKey: 'parentUserId',
-      as: 'emergencyContacts'
+      as: 'emergencyContacts',
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     });
 
     this.hasMany(models.Withdrawal, {
       foreignKey: 'retrieverUserId',
-      as: 'retrievedWithdrawals'
+      as: 'retrievedWithdrawals',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
     this.hasMany(models.Withdrawal, {
       foreignKey: 'guardianAuthorizerUserId',
-      as: 'guardianAuthorizedWithdrawals'
+      as: 'guardianAuthorizedWithdrawals',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
     this.hasMany(models.Withdrawal, {
       foreignKey: 'organizationApproverUserId',
-      as: 'approvedWithdrawals'
+      as: 'approvedWithdrawals',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
     this.hasMany(models.Delegate, {
       foreignKey: 'parentUserId',
-      as: 'delegates'
+      as: 'delegates',
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     });
 
     this.hasMany(models.QrAuthorization, {
       foreignKey: 'generatedByUserId',
-      as: 'generatedQrAuthorizations'
+      as: 'generatedQrAuthorizations',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     });
 
 

@@ -5,22 +5,24 @@ import validate from '../../middlewares/validation.middleware';
 import {
   getQrInfoSchema,
   processQrSchema,
+  manualAuthorizationSchema,
   manualWithdrawalSchema,
   getHistorySchema,
-  searchStudentSchema
+  searchStudentSchema,
+  getStatsSchema 
 } from '../validators/inspector_withdrawal.validators';
 
 const router = Router();
 
-// Aplicar middleware de autenticación a todas las rutas
 router.use(isInspector);
 
-// Rutas
 router.get('/qr/:qrCode/info', validate(getQrInfoSchema), InspectorWithdrawalController.getQrInfo);
-router.post('/qr/process', validate(processQrSchema), InspectorWithdrawalController.processQrDecision);
-router.post('/manual', validate(manualWithdrawalSchema), InspectorWithdrawalController.processManualWithdrawal);
-router.get('/reasons', InspectorWithdrawalController.getWithdrawalReasons);
 router.get('/student/:rut', validate(searchStudentSchema), InspectorWithdrawalController.searchStudentByRut);
+router.get('/reasons', InspectorWithdrawalController.getWithdrawalReasons);
+router.get('/stats', validate(getStatsSchema), InspectorWithdrawalController.getInspectorStats);
 router.get('/history', validate(getHistorySchema), InspectorWithdrawalController.getWithdrawalHistory);
+router.post('/qr/process', validate(processQrSchema), InspectorWithdrawalController.processQrDecision);
+router.post('/authorize-manual', validate(manualAuthorizationSchema), InspectorWithdrawalController.authorizeManually);
+router.post('/manual', validate(manualWithdrawalSchema), InspectorWithdrawalController.processManualWithdrawal);
 
 export default router;
