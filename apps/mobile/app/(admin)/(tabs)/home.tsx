@@ -32,8 +32,8 @@ export default function HomeScreen() {
         <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
 
         <OptionButton
-          title="Carga de Datos"
-          //onPress={() => router.navigate('/misAlumnos')}
+          title="Gestión de Datos"
+          onPress={() => router.navigate('/crud')}
           icon={<Ionicons name="document-attach" style={{ fontSize: 30, color: '#1D4ED8' }} />}
         />
         <OptionButton
