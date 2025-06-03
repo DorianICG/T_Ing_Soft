@@ -12,7 +12,10 @@ import {
   LoginSuccessDetails,
 } from '../services/api';
 
+//Datos del ususario que inicia sesion
 const PERMANENT_TOKEN_KEY = 'user-permanent-token';
+const USER_FIRST_NAME_KEY = 'user-first-name';
+const USER_LAST_NAME_KEY = 'user-last-name';
 
 // --- Funciones auxiliares para almacenamiento multiplataforma ---
 const storeToken = async (key: string, value: string) => {
@@ -168,6 +171,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(permanentToken);
     setUser(userData);
     await storeToken(PERMANENT_TOKEN_KEY, permanentToken); // Usar storeToken
+    await storeToken(USER_FIRST_NAME_KEY, userData.firstName);
+    await storeToken(USER_LAST_NAME_KEY, userData.lastName);
     clearIntermediateStates();
     redirectToRole(userData.role);
   }, [redirectToRole]);
@@ -262,6 +267,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearIntermediateStates();
     setToken(null); setUser(null);
     await deleteToken(PERMANENT_TOKEN_KEY); // Usar deleteToken
+    await deleteToken(USER_FIRST_NAME_KEY);
+    await deleteToken(USER_LAST_NAME_KEY);
     setIsLoading(false);
     // La redirección a login la manejará el useEffect principal
   }, []);

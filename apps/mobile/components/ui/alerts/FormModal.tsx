@@ -10,7 +10,7 @@ interface Props {
 
 export default function FormModal({ visible, title, children, footer }: Props) {
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <Text style={styles.title}>{title}</Text>

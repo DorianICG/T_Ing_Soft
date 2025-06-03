@@ -1,6 +1,6 @@
 //AQUI SE ALOJAN TODOS LAS APIS QUE UTILIZA PARENT PARA RECOLECCION DE DATOS
-import { API_BASE_URL } from './api'; // Importacion para obtener IP a utilizar
-import { getToken } from './authStorage'; // Importracion para envio de token al backend
+import { API_BASE_URL } from '../api'; // Importacion para obtener IP a utilizar
+import { getToken } from '../authStorage'; // Importracion para envio de token al backend
 
 // Funcion para enviar datos
 const getAuthHeaders = async () => {
@@ -23,6 +23,7 @@ export const fetchParentStudents = async () => {
   return json.data;
 };
 
+// Funcion para obtener todas las razones de un retiro
 export const fetchWithdrawalReasons = async () => {
   const response = await fetch(`${API_BASE_URL}/withdrawals/parent/reasons`, {
     method: 'GET',
@@ -33,6 +34,7 @@ export const fetchWithdrawalReasons = async () => {
   return json.data;
 };
 
+// Funcion para generar el codigo QR
 export const generateQrCode = async (studentId: number, reasonId: number, customReason?: string) => {
   const response = await fetch(`${API_BASE_URL}/withdrawals/parent/generate-qr`, {
     method: 'POST',
@@ -43,6 +45,19 @@ export const generateQrCode = async (studentId: number, reasonId: number, custom
   if (!response.ok) throw new Error(json.message || 'Error al generar QR');
   return json.data;
 };
+
+// Función para reenviar un código QR activo si ya existe
+export const resendActiveQrCode = async (studentId: number) => {
+  const response = await fetch(`${API_BASE_URL}/withdrawals/parent/students/${studentId}/resend-qr`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+  });
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Error al reenviar el QR');
+  return json.data;
+};
+
 
 export const fetchWithdrawalHistory = async (filters: {
   studentId?: number;

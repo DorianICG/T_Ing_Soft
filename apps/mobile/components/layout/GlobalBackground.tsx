@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, Dimensions, Image, StyleSheet, Text } from 'react-native';
 import image from '@/constants/images';
+import { useAuth } from '@/context/AuthContext';
+
 
 // Dimensiones y constantes
 const { height, width } = Dimensions.get('window');
 const topBlueAreaHeight = height / 6;
 const imageHeight = 170;
-
 const avatarImage = image.defaultImage.avatar; //IMAGEN DEFAULT, CAMBIAR CON APIS SI SE DESEA
 
 interface GlobalBackgroundProps {
@@ -14,11 +15,15 @@ interface GlobalBackgroundProps {
 }
 
 const GlobalBackground: React.FC<GlobalBackgroundProps> = ({ children }) => {
+  const { user } = useAuth(); 
+  //console.log('Usuario en GlobalBackground:', user);
+  const fullName = user ? `${user.firstName} ${user.lastName}` : 'Usuario';
+  
   return (
     <View style={styles.topContainer}>
       {/* Contenido superior */}
       <View style={styles.topContent}>
-        <Text style={styles.topText}>NOMBRE</Text>
+        <Text style={styles.topText}>{fullName}</Text>
       </View>
 
       {/* Imagen del avatar */}
