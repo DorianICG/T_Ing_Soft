@@ -228,15 +228,12 @@ export const getStatsSchema = {
  */
 export const cancelQrSchema = {
   params: Joi.object({
-    identifier: Joi.alternatives()
-      .try(
-        Joi.number().integer().positive(),
-        Joi.string().pattern(/^\d{6}$/)
-      )
+    identifier: Joi.string()
+      .pattern(/^(\d+|\d{6})$/)
       .required()
       .messages({
-        'alternatives.match': 'El identificador debe ser un ID numérico o código de 6 dígitos',
-        'any.required': 'El identificador es obligatorio'
+        'string.pattern.base': 'Debe ser un ID numérico o código de 6 dígitos',
+        'any.required': 'Identificador requerido'
       })
   })
 };

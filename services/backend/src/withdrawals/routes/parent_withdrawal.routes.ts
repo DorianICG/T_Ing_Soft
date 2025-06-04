@@ -26,6 +26,6 @@ router.get('/history', validate(getHistorySchema), ParentWithdrawalController.ge
 router.get('/students/:studentId/history', validate(getStudentHistorySchema), ParentWithdrawalController.getStudentHistory);
 router.post('/generate-qr', validate(generateQrSchema), ParentWithdrawalController.generateQrCode);
 router.post('/students/:studentId/resend-qr', validate(resendQrSchema), ParentWithdrawalController.resendActiveQr);
-router.delete('/qr/:qrAuthId/cancel', validate(cancelQrSchema), ParentWithdrawalController.cancelActiveQr);
+router.delete('/qr/:identifier/cancel', validate(cancelQrSchema), ParentWithdrawalController.cancelActiveQr);
 
 export default router;
