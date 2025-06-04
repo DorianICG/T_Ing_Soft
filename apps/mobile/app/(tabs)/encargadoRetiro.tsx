@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import UserCard from '@/components/ui/cards/UserCard';
+
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
 } from 'react-native';
 
-import GlobalBackground from '@/components/layout/GlobalBackground'; 
+import GlobalBackground from '@/components/layout/GlobalBackground';
+import PrimaryButton from '@/components/ui/buttons/PrimaryButton';
 
 export default function SeleccionarPersonaScreen() {
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
@@ -31,8 +33,7 @@ export default function SeleccionarPersonaScreen() {
 
   return (
     <GlobalBackground>
-    <View className="flex-1 justify-center items-center px-5 max-w-[400px] mx-auto w-full">
-
+      <View className="flex-1 justify-center items-center px-5 max-w-[400px] mx-auto w-full">
         {/* Pregunta */}
         <Text className="text-xl font-bold text-blue-600 mb-4">
           ¿Quién retirará al alumno?
@@ -48,7 +49,7 @@ export default function SeleccionarPersonaScreen() {
                 selectedPerson === persona.nombre ? 'bg-blue-300' : ''
               }`}
             >
-              <View>
+              <View className="flex-1">
                 <Text className="text-base font-medium">{persona.nombre}</Text>
                 <Text className="text-sm text-gray-500">{persona.relacion}</Text>
               </View>
@@ -56,15 +57,11 @@ export default function SeleccionarPersonaScreen() {
           ))}
         </View>
 
-        {/* Botón continuar */}
-        <TouchableOpacity
-          disabled={!selectedPerson}
-          className={`py-3 px-8 rounded-lg self-center flex-row items-center justify-center bg-blue-600 ${
-            !selectedPerson ? 'opacity-50' : ''
-          }`}
-        >
-          <Text className="text-white font-medium">Continuar</Text>
-        </TouchableOpacity>
+        {/* Botón continuar usando PrimaryButton */}
+        <PrimaryButton
+          title="Continuar"
+          onPress={selectedPerson ? () => console.log('Botón presionado') : undefined}
+        />
       </View>
     </GlobalBackground>
   );
