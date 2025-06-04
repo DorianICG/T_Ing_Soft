@@ -10,11 +10,12 @@ export interface SupportTicketAttributes {
   tracking_number: string;
   status: 'open' | 'in progress' | 'closed';
   admin_response?: string | null;
+  admin_user_id?: number | null;
   created_at: CreationOptional<Date>;
   responded_at?: Date | null;
 }
 
-export interface SupportTicketCreationAttributes extends Optional<SupportTicketAttributes, 'id_ticket' | 'attachment' | 'admin_response' | 'created_at' | 'responded_at' | 'status'> {}
+export interface SupportTicketCreationAttributes extends Optional<SupportTicketAttributes, 'id_ticket' | 'attachment' | 'admin_response' | 'admin_user_id' | 'created_at' | 'responded_at' | 'status'> {}
 
 class SupportTicket extends Model<SupportTicketAttributes, SupportTicketCreationAttributes> implements SupportTicketAttributes {
   public id_ticket!: number;
@@ -24,10 +25,10 @@ class SupportTicket extends Model<SupportTicketAttributes, SupportTicketCreation
   public tracking_number!: string;
   public status!: 'open' | 'in progress' | 'closed';
   public admin_response!: string | null;
+  public admin_user_id!: number | null;
   public created_at!: Date;
   public responded_at!: Date | null;
 
-  // Relaciones
   public readonly user?: User;
 
   public static associate(models: any) {
@@ -46,7 +47,8 @@ export const initSupportTicketModel = () => {
       id_ticket: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
-        primaryKey: true
+        primaryKey: true,
+        field: 'id_ticket'
       },
       user_id: {
         type: DataTypes.INTEGER,
@@ -59,11 +61,16 @@ export const initSupportTicketModel = () => {
       },
       description: {
         type: DataTypes.TEXT,
-        allowNull: false
+        allowNull: false,
+        field: 'description',
+        validate: {
+          len: [10, 2000]
+        }
       },
       attachment: {
         type: DataTypes.STRING(255),
-        allowNull: true
+        allowNull: true,
+        field: 'attachment'
       },
       tracking_number: {
         type: DataTypes.STRING(50),
@@ -74,7 +81,8 @@ export const initSupportTicketModel = () => {
       status: {
         type: DataTypes.ENUM('open', 'in progress', 'closed'),
         defaultValue: 'open',
-        allowNull: false
+        allowNull: false,
+        field: 'status'
       },
       admin_response: {
         type: DataTypes.TEXT,
@@ -96,7 +104,7 @@ export const initSupportTicketModel = () => {
       sequelize: sequelizeInstance, 
       tableName: 'support_tickets',
       modelName: 'SupportTicket',
-      timestamps: false,
+      timestamps: false, 
       underscored: true
     }
   );

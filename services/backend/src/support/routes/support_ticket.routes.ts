@@ -1,41 +1,40 @@
 import { Router } from 'express';
 import validateRequest from '../../middlewares/validation.middleware';
-import { 
-    authenticate,
-    isAdmin,
-    isAuthenticated 
-} from '../../auth/middlewares/auth.middleware';
+import { isAdmin } from '../../auth/middlewares/auth.middleware';
 
 import {
     createSupportTicket,
-    updateAdminResponse,
-    getTicketById,
-    getUserTickets,
-    getAllTickets,
     getTicketByTrackingNumber,
+    getTicketsByRut,
+    getAllTickets,
+    getTicketById,
+    updateAdminResponse,
     updateTicketStatus,
     getTicketStats
 } from '../controllers/support_ticket.controller';
 
 import {
     createTicketSchema,
-    respondTicketSchema,
-    getTicketByIdSchema,
     getTicketByTrackingSchema,
-    getUserTicketsSchema,
+    getTicketsByRutSchema,
     getAllTicketsSchema,
+    getTicketByIdSchema,
+    respondTicketSchema,
     updateTicketStatusSchema,
     getTicketStatsSchema
 } from '../validators/support_ticket.validators';
 
 const router = Router();
 
+// RUTAS PÚBLICAS
+router.post('/', validateRequest(createTicketSchema), createSupportTicket);
+router.get('/track/:trackingNumber', validateRequest(getTicketByTrackingSchema), getTicketByTrackingNumber);
+router.get('/rut/:rut', validateRequest(getTicketsByRutSchema), getTicketsByRut);
+
+// RUTAS ADMIN
 router.get('/stats', isAdmin, validateRequest(getTicketStatsSchema), getTicketStats);
-router.get('/my-tickets', isAuthenticated, validateRequest(getUserTicketsSchema), getUserTickets);
-router.get('/track/:trackingNumber', isAuthenticated, validateRequest(getTicketByTrackingSchema), getTicketByTrackingNumber);
-router.post('/', isAuthenticated, validateRequest(createTicketSchema), createSupportTicket);
 router.get('/', isAdmin, validateRequest(getAllTicketsSchema), getAllTickets);
-router.get('/:id', isAuthenticated, validateRequest(getTicketByIdSchema), getTicketById);
+router.get('/:id', isAdmin, validateRequest(getTicketByIdSchema), getTicketById);
 router.put('/:id/respond', isAdmin, validateRequest(respondTicketSchema), updateAdminResponse);
 router.patch('/:id/status', isAdmin, validateRequest(updateTicketStatusSchema), updateTicketStatus);
 
