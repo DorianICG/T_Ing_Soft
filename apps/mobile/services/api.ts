@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 // Obtener la URL base de las variables de entorno de Expo o usar un valor predeterminado
 const { manifest } = Constants;
 
-const DEVELOPMENT_API_URL = "http://192.168.0.5:3000/api"; // Esto puede servir como fallback si todo lo demás falla, modificar según tu entorno de desarrollo
+const DEVELOPMENT_API_URL = "http://192.168.56.1:3000/api"; // Esto puede servir como fallback si todo lo demás falla, modificar según tu entorno de desarrollo
 
 const localApiUrlAttempt = manifest?.debuggerHost ? `http://${manifest.debuggerHost.split(':')[0]}:3000/api` : undefined;
 
