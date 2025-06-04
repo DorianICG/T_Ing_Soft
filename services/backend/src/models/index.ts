@@ -12,6 +12,9 @@ import QrAuthorizationClass, { initQrAuthorizationModel } from './QrAuthorizatio
 import WithdrawalReasonClass, { initWithdrawalReasonModel } from './WithdrawalReason';
 import StudentClass, { initStudentModel } from './Student';
 import CourseClass, { initCourseModel } from './Course';
+import SupportTicketClass, { initSupportTicketModel } from './SupportTicket';
+import TutorialVideoClass, { initTutorialVideoModel } from './TutorialVideo';
+import UserTutorialViewClass, { initUserTutorialViewModel } from './UserTutorialView';
 
 // Inicializar modelos
 const User = initUserModel();
@@ -25,6 +28,9 @@ const QrAuthorization = initQrAuthorizationModel();
 const WithdrawalReason = initWithdrawalReasonModel();
 const Student = initStudentModel();
 const Course = initCourseModel();
+const SupportTicket = initSupportTicketModel();
+const TutorialVideo = initTutorialVideoModel();
+const UserTutorialView = initUserTutorialViewModel();
 
 const db = {
   sequelize: sequelizeInstance,
@@ -40,6 +46,9 @@ const db = {
   WithdrawalReason,
   Student,
   Course,
+  SupportTicket,
+  TutorialVideo,
+  UserTutorialView,
 };
 
 type ModelsType = typeof db & {
@@ -54,6 +63,9 @@ type ModelsType = typeof db & {
     WithdrawalReason: typeof WithdrawalReasonClass;
     Student: typeof StudentClass;
     Course: typeof CourseClass;
+    SupportTicket: typeof SupportTicketClass;
+    TutorialVideo: typeof TutorialVideoClass;
+    UserTutorialView: typeof UserTutorialViewClass;
 };
 
 Object.values(db).forEach((model: any) => {
@@ -76,4 +88,7 @@ export {
   WithdrawalReason,
   Student,
   Course,
+  SupportTicket,
+  TutorialVideo,
+  UserTutorialView,
 };

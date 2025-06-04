@@ -6,6 +6,7 @@ import authRoutes from './auth/routes/auth.routes';
 import adminRoutes from './admin/routes/admin.routes';
 import withdrawalRoutes from './withdrawals/routes';
 import userRoutes from './user/routes/user.routes';
+import supportRoutes from './support/routes';
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/support', supportRoutes);
 
 // Ruta simple para verificar que el servidor está vivo
 app.get('/', (req, res) => {
