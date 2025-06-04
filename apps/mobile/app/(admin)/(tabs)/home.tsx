@@ -18,14 +18,14 @@ export default function HomeScreen() {
 
       <OptionButton
         title="Validar Retiro"
-        //onPress={() => router.navigate('/validarRetiro')}
+        onPress={() => router.navigate('/scanner')}
         icon={<Ionicons name="qr-code-outline" size={30} color="#1D4ED8" />}
       />
 
         <OptionButton
           title="Retiro Manual"
-          //onPress={() => router.navigate('/validarRetiro')}
-          icon={<Ionicons name="qr-code-outline" size={30} color="#1D4ED8" />}
+          onPress={() => router.navigate('/manual-entry')}
+          icon={<Ionicons name="pencil-outline" size={30} color="#1D4ED8" />}
         />
         
         {/*Sección Opciones*/}
@@ -35,11 +35,6 @@ export default function HomeScreen() {
           title="Gestión de Datos"
           onPress={() => router.navigate('/crud')}
           icon={<Ionicons name="document-attach" style={{ fontSize: 30, color: '#1D4ED8' }} />}
-        />
-        <OptionButton
-          title="Creación Perfiles" 
-          //onPress={() => router.navigate('/misDelegados')}
-          icon={<Ionicons name="person" size={30} color="#1D4ED8" />} 
         />
 
         <OptionButton

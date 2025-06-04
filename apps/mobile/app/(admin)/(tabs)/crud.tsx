@@ -1,130 +1,207 @@
-import React, { useState } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Text, View, StyleSheet } from 'react-native';
 import GlobalBackground from '@/components/layout/GlobalBackground';
-import { useRouter } from 'expo-router';
 import SecondaryButton from '@/components/ui/buttons/SecondaryButton';
 import GenericDataTable from '@/components/ui/tables/genericDataTable';
 import RoundedIconButton from '@/components/ui/buttons/IconButtonSimple';
-import ConfirmModal from '@/components/ui/alerts/ConfirmModal';
-import FormModal from '@/components/ui/alerts/FormModal';
-import DynamicForm from '@/components/ui/input/DynamicForm';
+import { getUsers } from '@/services/CRUD/adminUsers';
+import { getStudents } from '@/services/CRUD/adminStudents';
+import { getCourses } from '@/services/CRUD/adminCourses';
+import { useRouter } from 'expo-router';
+import { useAppContext } from '@/context/AppContext';
+import { useRef } from 'react';
+import { useFiltersContext } from '@/context/FiltersContext';
+
 
 export default function CRUDScreen() {
-  const router = useRouter();
   const [activeSection, setActiveSection] = useState<'alumnos' | 'usuarios' | 'cursos'>('alumnos');
+const hasFetchedOnFocus = useRef(false);
+  const [isReadyToRender, setIsReadyToRender] = useState(false);
 
-  // Set de modal eliminar
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<any>(null);
+  const router = useRouter();
+const cleanedFilters = useRef(false);
 
-  const handleDeletePress = (item: any) => {
-    setItemToDelete(item);
-    setDeleteModalVisible(true);
-  };
+const { data, setData } = useAppContext();
 
-  const handleConfirmDelete = () => {
-    if (itemToDelete) {
-      console.log('Eliminar:', itemToDelete);
-      // Aquí va la lógica real de eliminación, como actualizar el estado o llamar a la API
-      setDeleteModalVisible(false);
-      setItemToDelete(null);
+const { filters, setFilters } = useFiltersContext();
+
+
+  // Estado para datos a cargar
+  const [studentsData, setStudentsData] = useState<any[]>([]);
+  const [usuariosData, setUsuariosData] = useState<any[]>([]);
+  const [cursosData, setCursosData] = useState<any[]>([]);
+
+  // Estados de carga
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Extrae la función de fetch para reutilizarla
+const fetchData = async (customFilters: any = null) => {
+  setIsLoading(true);
+  setError(null);
+
+  const appliedFilters = customFilters || filters || { page: 1, limit: 100 };
+
+  try {
+    if (activeSection === 'usuarios') {
+      const response = await getUsers(appliedFilters);
+      const datosTabla = response.users.map((usuario: any) => ({
+        id: usuario.id,
+        nombreCompleto: `${usuario.firstName} ${usuario.lastName}`,
+        rut: usuario.rut,
+        email: usuario.email,
+        telefono: usuario.phone,
+        estado: usuario.isActive ? 'Activo' : 'Inactivo',
+        rol: usuario.roles?.[0]?.name || 'Sin rol',
+        organizacion: usuario.roles?.[0]?.organizationName || 'Sin organización',
+        rawData: usuario,
+      }));
+      setUsuariosData(datosTabla);
+    } else if (activeSection === 'alumnos') {
+      const response = await getStudents(appliedFilters);
+      const datosTabla = response.students.map((student: any) => ({
+        id: student.id,
+        rut: student.rut,
+        nombreCompleto: `${student.firstName} ${student.lastName}`,
+        birthDate: student.birthDate,
+        curso: student.course?.name || 'Sin curso',
+        rutApoderado: student.parent?.rut || 'Sin RUT',
+        nombreApoderado: student.parent
+          ? `${student.parent.firstName} ${student.parent.lastName}`
+          : 'Sin apoderado',
+        telefonoApoderado: student.parent?.phone || 'Sin teléfono',
+        emailApoderado: student.parent?.email || 'Sin email',
+        organizacion: student.organization?.name || 'Sin organización',
+        rawData: student,
+      }));
+      setStudentsData(datosTabla);
+    } else if (activeSection === 'cursos') {
+      const response = await getCourses(appliedFilters);
+      const datosTabla = response.courses.map((curso: any) => ({
+        id: curso.id,
+        nombre: curso.name,
+        organizacion: curso.organization?.name || 'Sin organización',
+        rawData: curso,
+      }));
+      setCursosData(datosTabla);
+    }
+  } catch (err: any) {
+    console.error(` Error al cargar ${activeSection}:`, err);
+    setError(err.message || 'Error desconocido');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  useEffect(() => {
+    // Limpia filtros al cambiar sección
+    setFilters({});
+  }, [activeSection]);
+
+
+useEffect(() => {
+  if (data && data.filters && Object.keys(data.filters).length > 0) {
+    setFilters(data.filters);
+  }
+}, [data?.filters]);
+
+
+  // Al usar useFocusEffect, se ejecuta cada vez que la pantalla se enfoca
+useFocusEffect(
+  useCallback(() => {
+    const cargarDatos = async () => {
+      setIsReadyToRender(false);
+
+      if (filters && Object.keys(filters).length > 0) {
+        console.log('Ejecutando búsqueda personalizada con filtros:', filters);
+        await fetchData(filters);
+      } else {
+        console.log('Cargando datos normalmente (sin filtros).');
+        await fetchData();
+      }
+
+      setIsReadyToRender(true);
+    };
+
+    cargarDatos();
+  }, [activeSection, filters])
+);
+
+
+
+
+
+
+const handleDeletePress = (item: any) => {
+  setData({
+    rawData: item.rawData,
+    section: activeSection,  
+  });
+  router.push('/crud-delete');
+};
+
+
+
+  
+const handleEditPress = (item: any) => {
+  setData(item.rawData);
+
+    // Redireccionar según sección activa
+    if (activeSection === 'alumnos') {
+      router.push('/crud-edit-student');
+    } else if (activeSection === 'usuarios') {
+      router.push('/crud-edit-user');
+    } else if (activeSection === 'cursos') {
+      router.push('/crud-edit-course');
     }
   };
 
-  const handleCancelDelete = () => {
-    setDeleteModalVisible(false);
-    setItemToDelete(null);
+  const handleBulkUploadPress = () => {
+    setData({ section: activeSection }); // guardamos sección para saber qué CSV se subirá
+    router.push('/crud-add-bulk'); // ruta donde estará la pantalla CSVUploadScreen
   };
 
-  // set modal editar
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [itemToEdit, setItemToEdit] = useState<any>(null);
-  const [formValues, setFormValues] = useState<{ [key: string]: string }>({});
-
-const handleEditPress = (item: any) => {
-  setIsEditMode(true);
-  setItemToEdit(item);
-  setFormValues({ ...item });
-  setEditModalVisible(true);
-};
-
-  const handleFormChange = (key: string, value: string) => {
-    setFormValues((prev) => ({ ...prev, [key]: value }));
-  };
-
-const handleAddPress = () => {
-  setIsEditMode(false);
-  setItemToEdit(null);
-  
-  // Crear objeto vacío según los campos visibles
-  const emptyValues: { [key: string]: string } = {};
-  currentData.fields.forEach((field) => {
-    emptyValues[field.key] = '';
-  });
-
-  setFormValues(emptyValues);
-  setEditModalVisible(true);
-};
-
-
+  // Datos de configuración por sección
   const sectionsData = {
     alumnos: {
-      data: [
-        {
-          rut: '41198621-7',
-          firstName: 'ELENA',
-          lastName: 'REBOLLEDO',
-          birthDate: '2012-04-03',
-          courseId: '1',
-          parentRut: '20963471-6',
-        },
-        {
-          rut: '22222222-2',
-          firstName: 'ALEX',
-          lastName: 'PÉREZ',
-          birthDate: '2011-06-15',
-          courseId: '2',
-          parentRut: '19384756-9',
-        },
-      ],
-      fields: [
+      tableFields: [
+        { key: 'nombreCompleto', label: 'Nombre completo' },
+        { key: 'curso', label: 'Curso' },
         { key: 'rut', label: 'RUT' },
-        { key: 'firstName', label: 'Nombre' },
-        { key: 'lastName', label: 'Apellido' },
-        { key: 'birthDate', label: 'Fecha de nacimiento' },
-        { key: 'courseId', label: 'ID del Curso' },
-        { key: 'parentRut', label: 'RUT Apoderado' },
+        { key: 'nombreApoderado', label: 'Nombre Apoderado' },
+        { key: 'rutApoderado', label: 'RUT Apoderado' },
       ],
+      data: studentsData,
       onEdit: handleEditPress,
       onDelete: handleDeletePress,
     },
     usuarios: {
-      data: [
-        { nombre: 'Admin', rol: 'Administrador', correo: 'admin@demo.com' },
-      ],
-      fields: [
-        { key: 'nombre', label: 'Nombre' },
+      tableFields: [
+        { key: 'nombreCompleto', label: 'Nombre completo' },
+        { key: 'rut', label: 'RUT' },
+        { key: 'email', label: 'Email' },
+        { key: 'telefono', label: 'Teléfono' },
+        { key: 'estado', label: 'Estado' },
         { key: 'rol', label: 'Rol' },
-        { key: 'correo', label: 'Correo' },
+        { key: 'organizacion', label: 'Organización' },
       ],
+      data: usuariosData,
       onEdit: handleEditPress,
       onDelete: handleDeletePress,
     },
     cursos: {
-      data: [
-        { curso: 'Matemáticas', codigo: 'MAT101', profesor: 'Juan Pérez' },
+      tableFields: [
+        { key: 'nombre', label: 'Nombre' },
       ],
-      fields: [
-        { key: 'curso', label: 'Curso' },
-        { key: 'codigo', label: 'Código' },
-        { key: 'profesor', label: 'Profesor' },
-      ],
+      data: cursosData,
       onEdit: handleEditPress,
       onDelete: handleDeletePress,
     },
   };
- const currentData = sectionsData[activeSection];
+
+  const currentData = sectionsData[activeSection];
 
   return (
     <GlobalBackground>
@@ -133,131 +210,96 @@ const handleAddPress = () => {
         <View style={styles.topSection}>
           <Text style={styles.title}>Gestión de datos</Text>
           <View style={styles.buttonRow}>
-            <View style={styles.buttonWrapper}>
-              <SecondaryButton
-                title="Alumnos"
-                onPress={() => setActiveSection('alumnos')}
-                disabled={activeSection === 'alumnos'}
-              />
-            </View>
-            <View style={styles.buttonWrapper}>
-              <SecondaryButton
-                title="Usuarios"
-                onPress={() => setActiveSection('usuarios')}
-                disabled={activeSection === 'usuarios'}
-              />
-            </View>
-            <View style={styles.buttonWrapper}>
-              <SecondaryButton
-                title="Cursos"
-                onPress={() => setActiveSection('cursos')}
-                disabled={activeSection === 'cursos'}
-              />
-            </View>
+            <SecondaryButton
+              title="Alumnos"
+              onPress={() => setActiveSection('alumnos')}
+              disabled={activeSection === 'alumnos'}
+            />
+            <SecondaryButton
+              title="Usuarios"
+              onPress={() => setActiveSection('usuarios')}
+              disabled={activeSection === 'usuarios'}
+            />
+            <SecondaryButton
+              title="Cursos"
+              onPress={() => setActiveSection('cursos')}
+              disabled={activeSection === 'cursos'}
+            />
           </View>
         </View>
 
         {/* Contenido */}
         <View style={styles.bottomSection}>
           <View style={styles.tableSection}>
+          {isReadyToRender ? (
             <GenericDataTable
-              data={currentData.data}
-              fields={currentData.fields}
-              onEdit={currentData.onEdit}
-              onDelete={currentData.onDelete}
+              fields={sectionsData[activeSection].tableFields}
+              data={sectionsData[activeSection].data}
+              onEdit={sectionsData[activeSection].onEdit}
+              onDelete={sectionsData[activeSection].onDelete}
             />
+          ) : (
+            <Text className="text-center mt-10 text-gray-500">Cargando datos...</Text>
+          )}
+
           </View>
 
-          <View style={styles.buttonRowBottom}>
-            {activeSection === 'alumnos' && (
+          {!isLoading && !error && (
+            <View style={styles.buttonRowBottom}>
+              {activeSection === 'alumnos' && (
+                <>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="search-outline" onPress={() => alert('Cargar archivo de alumnos')} />
+                    <Text style={styles.buttonText}>Buscar Alumno</Text>
+                  </View>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="add-outline" onPress={() => router.push('/crud-add-student')} />
+                    <Text style={styles.buttonText}>Agregar Alumno</Text>
+                  </View>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="server-outline" onPress={handleBulkUploadPress} />
+                    <Text style={styles.buttonText}>Carga Masiva</Text>
+                  </View>
+                </>
+              )}
+
+              {activeSection === 'usuarios' && (
               <>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="search-outline" onPress={() => alert('Cargar archivo de alumnos')} />
+                    <Text style={styles.buttonText}>Buscar Alumno</Text>
+                  </View>
                 <View style={styles.buttonItem}>
-                  <RoundedIconButton icon="document-outline" onPress={() => alert('Cargar archivo de alumnos')} />
-                  <Text style={styles.buttonText}>Cargar Archivo</Text>
+                  <RoundedIconButton icon="add-outline" onPress={() => router.push('/crud-add-user')} />
+                  <Text style={styles.buttonText}>Añadir Usuario</Text>
                 </View>
-                <View style={styles.buttonItem}>
-                  <RoundedIconButton icon="add-outline" onPress={handleAddPress}  />
-                  <Text style={styles.buttonText}>Agregar Alumno</Text>
-                </View>
-                <View style={styles.buttonItem}>
-                  <RoundedIconButton icon="server-outline" onPress={() => alert('Carga masiva')} />
-                  <Text style={styles.buttonText}>Carga Masiva</Text>
-                </View>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="server-outline" onPress={handleBulkUploadPress} />
+                    <Text style={styles.buttonText}>Carga Masiva</Text>
+                  </View>                
               </>
-            )}
+              )}
 
-            {activeSection === 'usuarios' && (
-              <View style={styles.buttonItem}>
-                <RoundedIconButton icon="add-outline" onPress={handleAddPress}  />
-                <Text style={styles.buttonText}>Añadir Usuario</Text>
-              </View>
-            )}
-
-            {activeSection === 'cursos' && (
-              <View style={styles.buttonItem}>
-                <RoundedIconButton icon="add-outline" onPress={handleAddPress}  />
-                <Text style={styles.buttonText}>Añadir Curso</Text>
-              </View>
-            )}
-          </View>
+              {activeSection === 'cursos' && (
+              <>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="search-outline" onPress={() => router.push('/crud-search-course')} />
+                    <Text style={styles.buttonText}>Buscar Curso</Text>
+                  </View>
+                <View style={styles.buttonItem}>
+                  <RoundedIconButton icon="add-outline" onPress={() => router.push('/crud-add-course')} />
+                  <Text style={styles.buttonText}>Añadir Curso</Text>
+                </View>
+                  <View style={styles.buttonItem}>
+                    <RoundedIconButton icon="server-outline" onPress={handleBulkUploadPress} />
+                    <Text style={styles.buttonText}>Carga Masiva</Text>
+                  </View>      
+              </>
+              )}
+            </View>
+          )}
         </View>
       </View>
-
-      {/* Sección modales */}
-
-      {/* ConfirmModal */}
-        <ConfirmModal
-          visible={deleteModalVisible}
-          message={`¿Estás seguro de que deseas eliminar a ${itemToDelete?.nombre || 'este elemento'}?`}
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-        />
-
-      {/* ConfirmModal */}
-<FormModal
-  visible={editModalVisible}
-  title={isEditMode ? `Editar ${itemToEdit?.firstName || 'registro'}` : 'Añadir nuevo'}
-  footer={
-    <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-      <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCancel}>
-        <Text>Cancelar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => {
-          if (isEditMode) {
-            console.log('Guardando edición:', formValues);
-            // lógica de edición real aquí
-          } else {
-            console.log('Añadiendo nuevo dato:', formValues);
-            // lógica de creación real aquí
-          }
-          setEditModalVisible(false);
-          setItemToEdit(null);
-        }}
-        style={styles.modalConfirm}
-      >
-        <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-          {isEditMode ? 'Guardar' : 'Añadir'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  }
->
-  <DynamicForm
-    fields={currentData.fields}
-    values={formValues}
-    onChange={handleFormChange}
-    editableKeys={
-      isEditMode && activeSection === 'alumnos'
-        ? ['firstName', 'lastName', 'courseId'] // los únicos permitidos para edición de alumnos
-        : undefined // todos los campos para nuevo registro
-    }
-  />
-</FormModal>
-
-
-
-
     </GlobalBackground>
   );
 }
@@ -286,9 +328,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 8,
   },
-  buttonWrapper: {
-    flex: 1,
-  },
   bottomSection: {
     flex: 1,
     justifyContent: 'space-between',
@@ -316,24 +355,4 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
-
-modalCancel: {
-  padding: 10,
-  backgroundColor: '#ccc',
-  borderRadius: 8,
-  marginRight: 8,
-},
-modalConfirm: {
-  padding: 10,
-  backgroundColor: '#007bff',
-  borderRadius: 8,
-},
-input: {
-  borderWidth: 1,
-  borderColor: '#ccc',
-  borderRadius: 6,
-  padding: 8,
-  marginTop: 4,
-},
-
 });

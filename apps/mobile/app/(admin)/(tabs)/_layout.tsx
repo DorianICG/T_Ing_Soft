@@ -7,11 +7,13 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 import '../../../global.css'; 
+import { FiltersProvider } from '@/context/FiltersContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
+    <FiltersProvider>
       <Tabs
         screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'dark'].tint,
@@ -33,10 +35,24 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="imports"
+          name="scanner"
           options={{
-            title: 'importaciones',
+            title: 'Calidar Retiro',
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="manual-entry"
+          options={{
+            title: 'Retiro Manual',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="pencil" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="crud"
+          options={{
+            title: 'Gestion de datos',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="document" color={color} />,
           }}
         />
         <Tabs.Screen
@@ -53,6 +69,71 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
           }}
         />
+
+        { /* Pantallas Stack*/ }
+        <Tabs.Screen
+          name="autorizacionRetiro"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="autorizacionRetiroManual"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="crud-add-bulk"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-add-course"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-add-student"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-add-user"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-delete"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-edit-course"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-edit-student"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-edit-user"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
+      </FiltersProvider>
   );
 }
