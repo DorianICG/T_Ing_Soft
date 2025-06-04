@@ -224,16 +224,16 @@ export const getStatsSchema = {
 
 /**
  * Schema para cancelar QR activo
- * DELETE /api/withdrawals/parent/qr/:identifier/cancel
+ * DELETE /api/withdrawals/parent/qr/:code/cancel
  */
 export const cancelQrSchema = {
   params: Joi.object({
     identifier: Joi.string()
-      .pattern(/^(\d+|\d{6})$/)
+      .pattern(/^\d{6}$/)
       .required()
       .messages({
-        'string.pattern.base': 'Debe ser un ID numérico o código de 6 dígitos',
-        'any.required': 'Identificador requerido'
+        'string.pattern.base': 'El código QR debe tener exactamente 6 dígitos',
+        'any.required': 'Código QR requerido'
       })
   })
 };

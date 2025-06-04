@@ -388,79 +388,42 @@ export class ParentWithdrawalController {
         });
         return;
       }
-      
-      if (!identifier) {
-        res.status(400).json({
-          success: false,
-          message: 'Identificador de QR requerido'
-        });
-        return;
-      } 
-
-      let qrAuth = null;  
-
-      if (!isNaN(parseInt(identifier))) {
-        qrAuth = await QrAuthorization.findOne({
-          where: {
-            id: parseInt(identifier),
-            generatedByUserId: parentUserId,
-            isUsed: false,
-            expiresAt: { [Op.gt]: new Date() }
-          },
-          include: [
-            {
-              model: Student,
-              as: 'student',
-              attributes: ['firstName', 'lastName']
-            }
-          ]
-        });
-      } 
-      else if (/^\d{6}$/.test(identifier)) {
-        qrAuth = await QrAuthorization.findOne({
-          where: {
-            code: identifier,
-            generatedByUserId: parentUserId,
-            isUsed: false,
-            expiresAt: { [Op.gt]: new Date() }
-          },
-          include: [
-            {
-              model: Student,
-              as: 'student',
-              attributes: ['firstName', 'lastName']
-            }
-          ]
-        });
-      }
-      else {
-        res.status(400).json({
-          success: false,
-          message: 'Identificador inválido. Use ID numérico o código de 6 dígitos'
-        });
-        return;
-      } 
-
+  
+      const qrAuth = await QrAuthorization.findOne({
+        where: {
+          code: identifier,
+          generatedByUserId: parentUserId,
+          isUsed: false,
+          expiresAt: { [Op.gt]: new Date() }
+        },
+        include: [
+          {
+            model: Student,
+            as: 'student',
+            attributes: ['firstName', 'lastName']
+          }
+        ]
+      });
+  
       if (!qrAuth) {
         res.status(404).json({
           success: false,
           message: 'Código QR no encontrado, ya usado, expirado o no pertenece a este apoderado'
         });
         return;
-      } 
-
+      }
+  
       const originalExpiresAt = qrAuth.expiresAt;
       const cancelledAt = new Date();
       
       await qrAuth.update({
         expiresAt: cancelledAt,
         updatedAt: cancelledAt
-      }); 
-
+      });
+  
       res.status(200).json({
         success: true,
         data: {
-          qrAuthId: qrAuth.id,
           qrCode: qrAuth.code,
           student: {
             firstName: qrAuth.student?.firstName,
