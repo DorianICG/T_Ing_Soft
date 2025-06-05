@@ -9,6 +9,7 @@ import config from '../../config/env';
 import { sendVerificationCode, sendPasswordResetEmail, sendUnlockEmail } from '../../utils/emailService';
 import { generateResetToken } from '../../utils/tokenHashing';
 import { verifyRecaptchaV3 } from '../../utils/captcha';
+import { Op } from 'sequelize';
 
 // Función para generar un código MFA de 6 dígitos
 const generateMfaCode = (): string => {
@@ -290,13 +291,18 @@ class AuthController {
     const { email, code } = req.body;
     try {
       const user = await User.findOne({
-        where: { email },
+        where: { 
+          email,
+          mfaCodeHash: { [Op.ne]: null },
+          mfaCodeExpiresAt: { [Op.gt]: new Date() }
+        },
         include: [{ 
           model: UserOrganizationRoleModel,
           as: 'organizationRoleEntries',
           required: false,
           include: [{ model: RoleModel, as: 'role', attributes: ['id', 'name'] }]
-        }]
+        }],
+        order: [['mfaCodeExpiresAt', 'DESC']]
       });
 
       const highestRoleName = user ? getHighestPriorityRole(user.organizationRoleEntries as any) : null;
