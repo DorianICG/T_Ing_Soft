@@ -101,8 +101,8 @@ export const initQrAuthorizationModel = () => {
         type: DataTypes.INTEGER, allowNull: false, field: 'student_id',
         references: { model: 'students', key: 'id' }
       },
-      generatedByUserId: { // Atributo en modelo
-        type: DataTypes.INTEGER, allowNull: false, field: 'generated_by_user_id', // Columna en BD
+      generatedByUserId: {
+        type: DataTypes.INTEGER, allowNull: false, field: 'generated_by_user_id',
         references: { model: 'users', key: 'id' }
       },
       reasonId: {
@@ -112,8 +112,8 @@ export const initQrAuthorizationModel = () => {
       expiresAt: { type: DataTypes.DATE, allowNull: false, field: 'expires_at' },
       isUsed: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_used' },
       customWithdrawalReason: { type: DataTypes.TEXT, allowNull: true, field: 'custom_withdrawal_reason' },
-      assignedDelegateId: { // Atributo en modelo
-        type: DataTypes.INTEGER, allowNull: true, field: 'assigned_delegate_id', // Columna en BD
+      assignedDelegateId: {
+        type: DataTypes.INTEGER, allowNull: true, field: 'assigned_delegate_id',
         references: { model: 'delegates', key: 'id' }
       },
     },

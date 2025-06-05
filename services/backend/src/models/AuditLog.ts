@@ -6,12 +6,9 @@ export interface AuditLogAttributes {
   id: CreationOptional<number>;
   tableName: string | null;
   recordId: number | null;
-  action: string | null; // e.g., 'CREATE', 'UPDATE', 'DELETE'
-  userId: ForeignKey<User['id']> | null; // Puede ser null si la acción es del sistema
+  action: string | null; 
+  userId: ForeignKey<User['id']> | null;
   changedAt?: Date;
-  // Considerar añadir un campo para los datos antiguos/nuevos, usualmente como JSONB
-  // oldValues: object | null;
-  // newValues: object | null;
 }
 
 export interface AuditLogCreationAttributes extends Optional<AuditLogAttributes, 'id' | 'tableName' | 'recordId' | 'action' | 'userId' | 'changedAt'> {}
