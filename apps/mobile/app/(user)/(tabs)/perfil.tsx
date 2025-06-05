@@ -1,56 +1,112 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useAuth } from '../../../context/AuthContext'; 
 import GlobalBackground from '@/components/layout/GlobalBackground'; 
+import { useAppContext } from '@/context/AppContext';
+import { fetchUserProfile } from '@/services/controllers/user';
+import ConfirmModal from '@/components/ui/alerts/ConfirmModal';
+import SecondaryButton from '@/components/ui/buttons/SecondaryButton';
+import { useRouter } from 'expo-router';
+
+interface UserProfile {
+  id: number;
+  rut: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  roles: string[];
+}
 
 export default function PerfilScreen() {
-  const { user, logout, isLoading } = useAuth();
+  const { logout, isLoading } = useAuth();
+  const { setData } = useAppContext();
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const router = useRouter();
 
-  const handleLogout = async () => {
-    Alert.alert(
-      "Cerrar Sesión",
-      "¿Estás seguro de que quieres cerrar sesión?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Sí, Salir", 
-          onPress: async () => {
-            try {
-              await logout();
-              // La redirección a login es manejada por AuthContext
-              // Si quisieras forzar aquí: router.replace('/(auth)/login');
-            } catch (error) {
-              console.error("Error al cerrar sesión:", error);
-              Alert.alert("Error", "No se pudo cerrar la sesión. Inténtalo de nuevo.");
-            }
-          },
-          style: "destructive" 
-        }
-      ]
-    );
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const user = await fetchUserProfile();
+        console.log('Perfil del usuario:', user);
+        setProfileData(user);
+        setData((prev: any) => ({
+          ...prev,
+          userIdPadre: user.id,
+        }));
+      } catch (err: any) {
+        console.error('Error al obtener perfil del usuario:', err.message);
+      }
+    };
+
+    loadUserProfile();
+  }, []);
+
+  const handleLogoutPress = () => {
+    setModalVisible(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setModalVisible(false);
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+  };
+
+  const handleCancelLogout = () => {
+    setModalVisible(false);
+  };
+
+  // Navegar a la pantalla de editar perfil con router.push
+  const handleEditProfile = () => {
+    router.push('/change-password'); // Ajusta el path según tu estructura de rutas
   };
 
   return (
     <GlobalBackground>
       <View style={styles.container}>
-        <Text style={styles.title}>Perfil del Usuario</Text>
-        {user && (
+        <Text style={styles.title}>Mi Perfil</Text>
+
+        {/* Datos perfil arriba */}
+        {profileData ? (
           <View style={styles.userInfoContainer}>
-            <Text style={styles.userInfoText}>Nombre: {user.firstName} {user.lastName}</Text>
-            <Text style={styles.userInfoText}>RUT: {user.rut}</Text>
-            <Text style={styles.userInfoText}>Email: {user.email}</Text>
-            <Text style={styles.userInfoText}>Rol: {user.role}</Text>
+            <Text style={styles.userInfoText}>Nombre: {profileData.firstName} {profileData.lastName}</Text>
+            <Text style={styles.userInfoText}>RUT: {profileData.rut}</Text>
+            <Text style={styles.userInfoText}>Email: {profileData.email}</Text>
+            <Text style={styles.userInfoText}>Rol: {profileData.roles[0]}</Text>
           </View>
+        ) : (
+          <Text style={styles.userInfoText}>Cargando perfil...</Text>
         )}
-        <TouchableOpacity
-          style={[styles.logoutButton, isLoading && styles.buttonDisabled]}
-          onPress={handleLogout}
-          disabled={isLoading}
-        >
-          <Text style={styles.logoutButtonText}>
-            {isLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
-          </Text>
-        </TouchableOpacity>
+
+        {/* Botones abajo */}
+        <View style={styles.buttonsContainer}>
+          <SecondaryButton
+            title="Cambiar Contraseña"
+            onPress={handleEditProfile}
+            disabled={isLoading}
+          />
+
+          <TouchableOpacity
+            style={[styles.logoutButton, isLoading && styles.buttonDisabled]}
+            onPress={handleLogoutPress}
+            disabled={isLoading}
+          >
+            <Text style={styles.logoutButtonText}>
+              {isLoading ? 'Cerrando sesión...' : 'Cerrar Sesión'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal confirmación */}
+        <ConfirmModal
+          visible={modalVisible}
+          message="¿Estás seguro de que quieres cerrar sesión?"
+          onConfirm={handleConfirmLogout}
+          onCancel={handleCancelLogout}
+        />
       </View>
     </GlobalBackground>
   );
@@ -59,33 +115,35 @@ export default function PerfilScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 20,
+    justifyContent: 'space-between',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e3a8a', // text-blue-800
+    color: '#1e3a8a',
     marginBottom: 20,
+    textAlign: 'center', // Centra el texto
   },
   userInfoContainer: {
-    marginBottom: 30,
+    marginTop: 40,
     alignItems: 'flex-start',
-    width: '100%',
     padding: 15,
-    backgroundColor: '#f9fafb', // bg-gray-50
+    backgroundColor: '#f9fafb',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb', // border-gray-200
+    borderColor: '#e5e7eb',
   },
   userInfoText: {
     fontSize: 16,
-    color: '#374151', // text-gray-700
+    color: '#374151',
     marginBottom: 8,
   },
+  buttonsContainer: {
+    paddingBottom: 40,
+  },
   logoutButton: {
-    backgroundColor: '#dc2626', // bg-red-600
+    backgroundColor: '#dc2626',
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 8,
@@ -93,9 +151,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoutButtonText: {
-    color: '#ffffff', // text-white
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: 'semibold',
+    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.5,

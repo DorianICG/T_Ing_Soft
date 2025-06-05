@@ -28,15 +28,17 @@ export default function HomeScreen() {
         <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
 
         <OptionButton
+          title="Mi perfil" 
+          onPress={() => router.navigate('/perfil')}
+          icon={<Ionicons name="person" size={30} color="#1D4ED8" />} 
+        />
+
+        <OptionButton
           title="Mis Alumnos"
           onPress={() => router.navigate('/misAlumnos')}
           icon={<FontAwesome5 name="graduation-cap" size={30} color="#1D4ED8" />}
         />
-        <OptionButton
-          title="Mis Delegados" 
-          onPress={() => router.navigate('/misDelegados')}
-          icon={<Ionicons name="person" size={30} color="#1D4ED8" />} 
-        />
+
 
         <OptionButton
           title="Historial de Retiros"
@@ -44,11 +46,7 @@ export default function HomeScreen() {
           icon={<Ionicons name="time-outline" size={30} color="#1D4ED8" />}
         />
 
-        <OptionButton
-          title="Notificaciones"
-          onPress={() => router.navigate('/notificaciones')}
-            icon={<Ionicons name="notifications" size={30} color="#1D4ED8" />}
-        />
+
       </ScrollView>
     </GlobalBackground>
   );

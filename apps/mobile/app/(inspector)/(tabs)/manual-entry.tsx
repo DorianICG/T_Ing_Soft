@@ -30,26 +30,26 @@ export default function ManualEntryScreen() {
           setReasons(reasonsData); // Asignamos los datos si todo es correcto
         } else {
           Alert.alert('Error', 'No se pudieron obtener los motivos de retiro');
-          setReasons([]); // Limpiamos el estado si la respuesta no es correcta
+          setReasons([]); 
         }
       } catch (error) {
         Alert.alert('Error', 'No se pudieron obtener los motivos de retiro');
-        setReasons([]); // Limpiamos el estado si hubo un error en la solicitud
+        setReasons([]); 
       } finally {
-        setLoadingReasons(false); // Cambiamos el estado de carga a false
+        setLoadingReasons(false); 
       }
     };
 
-    fetchReasons(); // Ejecutamos la llamada a la API al montar el componente
+    fetchReasons();
 
-    // Cleanup cuando el componente se desmonte (limpiamos los estados)
+    // Cleanup cuando el componente se desmonte 
     return () => {
-      setRut(''); // Limpiar el RUT
-      setSelectedReasonId(null); // Limpiar el motivo seleccionado
-      setCustomReason(''); // Limpiar el motivo personalizado
-      setReasons([]); // Limpiar los motivos
+      setRut(''); 
+      setSelectedReasonId(null); 
+      setCustomReason(''); 
+      setReasons([]); 
     };
-  }, []); // Al montar el componente, hacemos fetch de los motivos
+  }, []);
 
   // Lógica para buscar el estudiante por RUT
   const handleSearchStudent = async () => {
@@ -94,7 +94,7 @@ export default function ManualEntryScreen() {
   const handleSelectReason = (id: number, name: string) => {
     setSelectedReasonId(id);
     if (name.startsWith('OTRO')) {
-      setCustomReason(''); // Limpiar el campo de texto cuando se selecciona 'OTRO'
+      setCustomReason(''); 
     }
   };
 

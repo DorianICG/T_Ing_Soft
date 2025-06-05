@@ -27,14 +27,20 @@ export default function HomeScreen() {
           onPress={() => router.navigate('/manual-entry')}
           icon={<Ionicons name="pencil-outline" size={30} color="#1D4ED8" />}
         />
-        
-        {/*Sección Opciones*/}
-        <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
 
         <OptionButton
           title="Gestión de Datos"
           onPress={() => router.navigate('/crud')}
           icon={<Ionicons name="document-attach" style={{ fontSize: 30, color: '#1D4ED8' }} />}
+        />
+        
+        {/*Sección Opciones*/}
+        <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
+
+        <OptionButton
+          title="Mi perfil" 
+          onPress={() => router.navigate('/perfil')}
+          icon={<Ionicons name="person" size={30} color="#1D4ED8" />} 
         />
 
         <OptionButton
@@ -43,17 +49,6 @@ export default function HomeScreen() {
           icon={<Ionicons name="time-outline" size={30} color="#1D4ED8" />}
         />
 
-        <OptionButton
-          title="Notificaciones"
-          //onPress={() => router.navigate('/notificaciones')}
-            icon={<Ionicons name="notifications" size={30} color="#1D4ED8" />}
-        />
-
-        <OptionButton
-          title="Reportes"
-          //onPress={() => router.navigate('/notificaciones')}
-            icon={<Ionicons name="folder-open" size={30} color="#1D4ED8" />}
-        />
       </ScrollView>
     </GlobalBackground>
   );

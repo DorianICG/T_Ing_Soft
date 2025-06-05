@@ -11,11 +11,11 @@ import SecondaryButton from '@/components/ui/buttons/SecondaryButton';
 import AlertModal from '@/components/ui/alerts/AlertModal';
 import { updateUser } from '@/services/CRUD/adminUsers';
 import SelectOptionButton from '@/components/ui/buttons/SelectOptionButton';
-
+import SwitchToggle from '@/components/ui/input/SwitchToggle'; // 👉 Asegúrate que este componente exista
 
 export default function CrudEditStudentScreen() {
   const router = useRouter();
-  const { data } = useAppContext(); // datos del usuario a editar
+  const { data } = useAppContext();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -27,21 +27,17 @@ export default function CrudEditStudentScreen() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const roles = ['PARENT', 'INSPECTOR'];
 
-
-useEffect(() => {
-  if (data) {
-    console.log('Datos recibidos desde el contexto:', data);
-
-    setFirstName(data.firstName || '');
-    setLastName(data.lastName || '');
-    setEmail(data.email || '');
-    setPhone(data.phone || '');
-    setIsActive(data.isActive ?? true);
-    setRoleName(data.roles?.[0]?.name || ''); // 👈 Corrige el nombre del rol
-  }
-}, [data]);
+  useEffect(() => {
+    if (data) {
+      setFirstName(data.firstName || '');
+      setLastName(data.lastName || '');
+      setEmail(data.email || '');
+      setPhone(data.phone || '');
+      setIsActive(data.isActive ?? true);
+      setRoleName(data.roles?.[0]?.name || '');
+    }
+  }, [data]);
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -108,21 +104,28 @@ useEffect(() => {
                 onChangeText={setPhone}
                 placeholder="123456789"
               />
-            <View className="w-full">
-            <Text className="text-sm font-medium text-gray-600">Rol</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2 mb-4">
-                {['PARENT', 'INSPECTOR'].map((role) => (
-                <View key={role} className="mr-4">
-                    <SelectOptionButton
-                    label={role}
-                    isSelected={roleName === role}
-                    onPress={() => setRoleName(role)}
-                    />
-                </View>
-                ))}
-            </ScrollView>
-            </View>
 
+              {/* Toggle Activo/Inactivo */}
+              <SwitchToggle
+                label="Usuario Activo"
+                value={isActive}
+                onValueChange={setIsActive}
+              />
+
+              <View className="w-full">
+                <Text className="text-sm font-medium text-gray-600">Rol</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2 mb-4">
+                  {['PARENT', 'INSPECTOR'].map((role) => (
+                    <View key={role} className="mr-4">
+                      <SelectOptionButton
+                        label={role}
+                        isSelected={roleName === role}
+                        onPress={() => setRoleName(role)}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
 
               <View className="flex-row justify-between items-center p-4 w-full">
                 <View className="w-1/3">

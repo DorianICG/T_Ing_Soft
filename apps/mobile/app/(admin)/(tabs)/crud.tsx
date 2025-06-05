@@ -249,7 +249,7 @@ const handleEditPress = (item: any) => {
               {activeSection === 'alumnos' && (
                 <>
                   <View style={styles.buttonItem}>
-                    <RoundedIconButton icon="search-outline" onPress={() => alert('Cargar archivo de alumnos')} />
+                    <RoundedIconButton icon="search-outline" onPress={() => router.push('/crud-search-student')} />
                     <Text style={styles.buttonText}>Buscar Alumno</Text>
                   </View>
                   <View style={styles.buttonItem}>
@@ -266,8 +266,8 @@ const handleEditPress = (item: any) => {
               {activeSection === 'usuarios' && (
               <>
                   <View style={styles.buttonItem}>
-                    <RoundedIconButton icon="search-outline" onPress={() => alert('Cargar archivo de alumnos')} />
-                    <Text style={styles.buttonText}>Buscar Alumno</Text>
+                    <RoundedIconButton icon="search-outline" onPress={() => router.push('/crud-search-user')} />
+                    <Text style={styles.buttonText}>Buscar Usuario</Text>
                   </View>
                 <View style={styles.buttonItem}>
                   <RoundedIconButton icon="add-outline" onPress={() => router.push('/crud-add-user')} />

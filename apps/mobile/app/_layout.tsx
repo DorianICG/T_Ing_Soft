@@ -12,6 +12,7 @@ import { ActivityIndicator, Text, View, Image } from 'react-native';
 import { AppProvider } from '@/context/AppContext';
 
 import images from '@/constants/images';
+import { FiltersProvider } from '@/context/FiltersContext';
 
 // Prevenir que la splash screen se oculte automáticamente
 SplashScreen.preventAutoHideAsync();
@@ -69,7 +70,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <AppProvider>
+        <FiltersProvider>
         <InitialLayout />
+        </FiltersProvider>
       </AppProvider>
     </AuthProvider>
   );

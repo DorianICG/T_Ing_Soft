@@ -88,3 +88,42 @@ export const getWithdrawalReasons = async () => {
   
   return json.data;
 };
+
+
+// Función para obtener datos historial
+export const fetchInspectorWithdrawalHistory = async (filters: {
+  studentId?: number;
+  studentRut?: string;
+  status?: string;
+  method?: string;
+  approverId?: number;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}) => {
+  const params = new URLSearchParams();
+
+  if (filters.studentId) params.append('studentId', filters.studentId.toString());
+  if (filters.studentRut) params.append('studentRut', filters.studentRut);
+  if (filters.status) params.append('status', filters.status);
+  if (filters.method) params.append('method', filters.method);
+  if (filters.approverId) params.append('approverId', filters.approverId.toString());
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+  if (filters.limit) params.append('limit', filters.limit.toString());
+  if (filters.offset) params.append('offset', filters.offset.toString());
+
+  const response = await fetch(`${API_BASE_URL}/withdrawals/inspector/history?${params.toString()}`, {
+    method: 'GET',
+    headers: await getAuthHeaders(),
+  });
+
+  const json = await response.json();
+
+  if (!response.ok) {
+    throw new Error(json.message || 'Error al obtener historial de retiros');
+  }
+
+  return json.data;
+};

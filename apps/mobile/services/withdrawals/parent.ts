@@ -58,7 +58,7 @@ export const resendActiveQrCode = async (studentId: number) => {
   return json.data;
 };
 
-
+//Historial retiro
 export const fetchWithdrawalHistory = async (filters: {
   studentId?: number;
   status?: string;
@@ -78,4 +78,58 @@ export const fetchWithdrawalHistory = async (filters: {
   const json = await response.json();
   if (!response.ok) throw new Error(json.message || 'Error al obtener historial');
   return json.data;
+};
+
+// Obtener historial de retiros del apoderado autenticado
+export const fetchParentWithdrawalHistory = async ({
+  studentId,
+  limit = 20,
+  offset = 0,
+  includePending = true,
+}: {
+  studentId?: number;
+  limit?: number;
+  offset?: number;
+  includePending?: boolean;
+}) => {
+  const params = new URLSearchParams();
+  params.append('limit', limit.toString());
+  params.append('offset', offset.toString());
+  if (studentId !== undefined) params.append('studentId', studentId.toString());
+  if (includePending) params.append('includePending', 'true');
+
+  const response = await fetch(`${API_BASE_URL}/withdrawals/parent/history?${params.toString()}`, {
+    method: 'GET',
+    headers: await getAuthHeaders(),
+  });
+
+  const json = await response.json();
+
+  if (!response.ok) {
+    throw new Error(json.message || 'Error al obtener historial de retiros');
+  }
+
+  return json.data; // Contiene: withdrawals, total, summary, pagination
+};
+
+// Función para cancelar código QR activo dado un identificador (id numérico o código de 6 dígitos)
+export const cancelActiveQrCode = async (identifier: string | number) => {
+  if (!identifier) throw new Error('Identificador de QR requerido');
+
+  console.log('Identificador recibido:', identifier);
+
+  const url = `${API_BASE_URL}/withdrawals/parent/qr/${identifier}/cancel`;
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: await getAuthHeaders(),
+  });
+
+  const json = await response.json();
+
+  if (!response.ok) {
+    throw new Error(json.message || 'Error al cancelar el código QR');
+  }
+
+  return json.data; // Aquí está la data de la respuesta exitosa del backend
 };

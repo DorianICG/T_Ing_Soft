@@ -56,15 +56,14 @@ const handleAuthorization = async (status: string) => {
 
   // Determinar el valor de customReason
   const customReasonToSend = withdrawalReason.reasonName.startsWith('OTRO')
-    ? withdrawalReason.customReason || ""  // Usar customReason solo si el motivo es "OTRO"
-    : withdrawalReason.reasonName;        // Si no es "OTRO", usamos reasonName como customReason
+    ? withdrawalReason.customReason || ""  
+    : withdrawalReason.reasonName;       
 
   // Set loading to true to disable buttons
   setLoading(true);
 
   // Llamada a la API para autorizar el retiro
   try {
-    // Llamamos a la API de autorización con los datos correspondientes
     const response = await authorizeManualWithdrawal(
       student.id,  // studentId
       withdrawalReason.reasonId,  // reasonId
@@ -83,7 +82,7 @@ const handleAuthorization = async (status: string) => {
     setModalMessage('Hubo un error al autorizar el retiro, volviendo al menu principal.');
     setModalVisible(true);
   } finally {
-    // No hacer nada por ahora, redirección se maneja cuando se cierra el modal
+    
   }
 };
 

@@ -207,3 +207,25 @@ export const createUsersBulk = async ({
 
   return json; // Puede contener resultados parciales (HTTP 207)
 };
+
+// Cambiar estado activo/inactivo de un usuario
+export const toggleUserStatus = async (
+  userId: number,
+  isActive: boolean
+) => {
+  const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/toggle-status`, {
+    method: 'PUT',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ isActive }),
+  });
+
+  const json = await response.json();
+
+  if (!response.ok) {
+    console.error(' Error al cambiar estado de usuario:', json);
+    throw new ApiError(json.error || 'Error al cambiar estado del usuario', json.code, response.status);
+  }
+
+  console.log(' Estado del usuario actualizado con éxito:', json);
+  return json;
+};

@@ -26,34 +26,32 @@ export default function HomeScreen() {
         <OptionButton
           title="Retiro Manual"
           onPress={() => router.navigate('/manual-entry')}
-          icon={<Ionicons name="qr-code-outline" size={30} color="#1D4ED8" />}
+          icon={<Ionicons name="pencil-outline" size={30} color="#1D4ED8" />}
         />
         
         {/*Sección Opciones*/}
         <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
 
         <OptionButton
-          title="Alumnos"
-          //onPress={() => router.navigate('/misAlumnos')}
-          icon={<FontAwesome5 name="graduation-cap" size={30} color="#1D4ED8" />}
-        />
-        <OptionButton
-          title="Autorizados" 
-          //onPress={() => router.navigate('/misDelegados')}
+          title="Mi perfil" 
+          onPress={() => router.navigate('/perfil')}
           icon={<Ionicons name="person" size={30} color="#1D4ED8" />} 
         />
 
         <OptionButton
+          title="Alumnos"
+          onPress={() => router.navigate('/inspectorStudents')}
+          icon={<FontAwesome5 name="graduation-cap" size={30} color="#1D4ED8" />}
+        />
+
+
+        <OptionButton
           title="Historial de Retiros"
-          //onPress={() => router.navigate('/historialRetiros')}
+          onPress={() => router.navigate('/historialRetiros')}
           icon={<Ionicons name="time-outline" size={30} color="#1D4ED8" />}
         />
 
-        <OptionButton
-          title="Notificaciones"
-          //onPress={() => router.navigate('/notificaciones')}
-            icon={<Ionicons name="notifications" size={30} color="#1D4ED8" />}
-        />
+
       </ScrollView>
     </GlobalBackground>
   );

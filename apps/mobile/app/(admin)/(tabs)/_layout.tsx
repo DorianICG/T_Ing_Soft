@@ -7,13 +7,14 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 import '../../../global.css'; 
-import { FiltersProvider } from '@/context/FiltersContext';
+import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <FiltersProvider>
+
       <Tabs
         screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'dark'].tint,
@@ -34,41 +35,62 @@ export default function TabLayout() {
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
           }}
         />
+
         <Tabs.Screen
           name="scanner"
           options={{
-            title: 'Calidar Retiro',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="qrcode" color={color} />,
+            title: 'Validar Retiro',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="qr-code-outline" size={size ?? 28} color={color} />
+            ),
           }}
         />
+
         <Tabs.Screen
           name="manual-entry"
           options={{
             title: 'Retiro Manual',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="pencil" color={color} />,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="pencil-outline" size={size ?? 28} color={color} />
+            ),
           }}
         />
+
         <Tabs.Screen
           name="crud"
           options={{
-            title: 'Gestion de datos',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="document" color={color} />,
+            title: 'Gestion de Datos',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="document-attach" size={size ?? 28} color={color} />
+            ),
           }}
         />
-        <Tabs.Screen
-          name="users"
-          options={{
-            title: 'usuarios',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
-          }}
-        />
+
+
+
         <Tabs.Screen
           name="perfil"
           options={{
-            title: 'perfil',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+            title: 'Perfil',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="person" size={size ?? 28} color={color} />
+            ),
           }}
         />
+
+
+
+        <Tabs.Screen
+          name="historialRetiros"
+          options={{
+            title: 'Historial',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="time-outline" size={size ?? 28} color={color} />
+            ),
+          }}
+        />
+
+
 
         { /* Pantallas Stack*/ }
         <Tabs.Screen
@@ -133,7 +155,38 @@ export default function TabLayout() {
             href: null,
           }}
         />
+        <Tabs.Screen
+          name="crud-search-course"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-search-student"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="crud-search-user"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="change-password"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="seleccionHistorialRetiros"
+          options={{
+            href: null,
+          }}
+        />
       </Tabs>
-      </FiltersProvider>
   );
 }
