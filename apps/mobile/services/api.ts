@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 // Obtener la URL base de las variables de entorno de Expo o usar un valor predeterminado
 const { manifest } = Constants;
 
-const DEVELOPMENT_API_URL = "http://192.168.0.5:3000/api"; // Esto puede servir como fallback si todo lo demás falla, modificar según tu entorno de desarrollo
+const DEVELOPMENT_API_URL = "http://192.168.56.1:3000/api"; // Esto puede servir como fallback si todo lo demás falla, modificar según tu entorno de desarrollo
 
 const localApiUrlAttempt = manifest?.debuggerHost ? `http://${manifest.debuggerHost.split(':')[0]}:3000/api` : undefined;
 
@@ -51,6 +51,43 @@ export interface LoginSuccessDetails {
   mfaRequired?: false;
 }
 
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ForgotPasswordApiResponse {
+  message: string; // "Si existe una cuenta asociada a ese email, se ha enviado un enlace para restablecer la contraseña."
+}
+
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordApiResponse {
+  message: string; // "Tu contraseña ha sido restablecida exitosamente."
+}
+
+interface ApiErrorDetail {
+  message: string;
+  field?: string;
+  location?: string;
+}
+
+export class DetailedApiError extends Error {
+  public errors?: ApiErrorDetail[];
+  public statusCode?: number;
+
+  constructor(message: string, errors?: ApiErrorDetail[], statusCode?: number) {
+    super(message);
+    this.name = 'DetailedApiError';
+    this.errors = errors;
+    this.statusCode = statusCode;
+    Object.setPrototypeOf(this, DetailedApiError.prototype);
+  }
+}
+
+
 export type LoginApiResponse = ForcePasswordChangeDetails | MfaRequiredDetails | LoginSuccessDetails;
 export type ForceChangePasswordApiResponse = MfaRequiredDetails | LoginSuccessDetails; // Puede llevar a MFA o a login directo
 export type VerifyMfaApiResponse = LoginSuccessDetails;
@@ -77,8 +114,11 @@ interface VerifyMfaPayload {
 const handleApiResponse = async (response: Response) => {
   const responseData = await response.json();
   if (!response.ok) {
-    const errorMessage = responseData.error || responseData.message || `Error HTTP: ${response.status}`;
-    throw new Error(errorMessage);
+    const errorMessage = responseData.message || responseData.error || `Error HTTP: ${response.status}`;
+    if (responseData.errors && Array.isArray(responseData.errors)) {
+      throw new DetailedApiError(errorMessage, responseData.errors, response.status);
+    }
+    throw new DetailedApiError(errorMessage, undefined, response.status);
   }
   return responseData;
 };
@@ -134,5 +174,41 @@ export const verifyMfaApi = async (payload: VerifyMfaPayload): Promise<VerifyMfa
     if (error instanceof Error) throw error;
     console.error('Fetch verifyMfaApi error:', error);
     throw new Error('No se pudo conectar al servidor o ocurrió un error inesperado al verificar MFA.');
+  }
+};
+
+export const requestPasswordResetApi = async (
+  payload: ForgotPasswordPayload
+): Promise<ForgotPasswordApiResponse> => {
+  const url = `${API_BASE_URL}/auth/forgot-password`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await handleApiResponse(response) as ForgotPasswordApiResponse;
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    console.error('Fetch requestPasswordResetApi error:', error);
+    throw new Error('No se pudo conectar al servidor o ocurrió un error inesperado al solicitar el reseteo de contraseña.');
+  }
+};
+
+export const resetPasswordApi = async (
+  payload: ResetPasswordPayload
+): Promise<ResetPasswordApiResponse> => {
+  const url = `${API_BASE_URL}/auth/reset-password`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return await handleApiResponse(response) as ResetPasswordApiResponse;
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    console.error('Fetch resetPasswordApi error:', error);
+    throw new Error('No se pudo conectar al servidor o ocurrió un error inesperado al restablecer la contraseña.');
   }
 };
