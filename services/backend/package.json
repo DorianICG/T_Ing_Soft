@@ -32,13 +32,13 @@
     "passport": "^0.7.0",
     "pg": "^8.15.6",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "@types/bcrypt": "^5.0.2",
+  "@types/cors": "^2.8.18",
+  "@types/node": "^22.15.3",
+  "@types/nodemailer": "^6.4.17"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
-    "@types/cors": "^2.8.18",
-    "@types/node": "^22.15.3",
-    "@types/nodemailer": "^6.4.17",
     "sequelize-cli": "^6.6.2",
     "typescript": "^5.8.3"
   }
