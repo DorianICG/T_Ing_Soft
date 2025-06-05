@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
-    "@types/cors": "^2.8.17",
+    "@types/cors": "^2.8.18",
     "@types/node": "^22.15.3",
     "@types/nodemailer": "^6.4.17",
     "sequelize-cli": "^6.6.2"
